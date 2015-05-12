@@ -38,6 +38,7 @@ type UserRecord struct {
     PrincipalExpire    IpaDateTime       `json:"krbprincipalexpiration"`
     LastLoginSuccess   IpaDateTime       `json:"krblastsuccessfulauth"`
     LastLoginFail      IpaDateTime       `json:"krblastfailedauth"`
+    Randompassword     string            `json:"randompassword"`
 }
 
 // Returns true if the UserRecord is in group
@@ -71,6 +72,33 @@ func (c *Client) UserShow(uid string) (*UserRecord, error) {
     }
 
     return &userRec, nil
+}
+
+// Reset user password and return new random password
+func (c *Client) ResetPassword(uid string) (string, error) {
+
+    options := map[string]interface{}{
+        "no_members": false,
+        "random": true,
+        "all": true}
+
+    res, err := c.rpc("user_mod", []string{uid}, options)
+
+    if err != nil {
+        return "", err
+    }
+
+    var userRec UserRecord
+    err = json.Unmarshal(res.Result.Data, &userRec)
+    if err != nil {
+        return "", err
+    }
+
+    if len(userRec.Randompassword) == 0 {
+        return "", errors.New("ipa: failed to reset user password. empty random password returned")
+    }
+
+    return userRec.Randompassword, nil
 }
 
 // Change users password
