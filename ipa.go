@@ -131,7 +131,12 @@ func (e *IpaError) Error() string {
     return fmt.Sprintf("ipa: error %d - %s", e.Code, e.Message)
 }
 
-// Clears out FreeIPA session id set by Client.Login
+// Set FreeIPA session id
+func (c *Client) SetSession(sid string) {
+    c.session = sid
+}
+
+// Clears out FreeIPA session id
 func (c *Client) ClearSession() {
     c.session = ""
 }
