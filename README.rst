@@ -25,7 +25,7 @@ Example calling FreeIPA user-show::
     )
 
     func main() {
-        c := &Client{KeyTab: "/path/to/host.keytab", Host: "ipa.example.com"}
+        c := &ipa.Client{KeyTab: "/path/to/host.keytab", Host: "ipa.example.com"}
 
         rec, err := c.UserShow("uid")
         if err != nil {
