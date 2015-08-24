@@ -208,6 +208,19 @@ func (c *Client) rpc(method string, params []string, options map[string]interfac
     return &ipaRes, nil
 }
 
+// Ping FreeIPA server to check connection
+func (c *Client) Ping() (*Response, error) {
+    options := map[string]interface{}{}
+
+    res, err := c.rpc("ping", []string{}, options)
+
+    if err != nil {
+        return nil, err
+    }
+
+    return res, nil
+}
+
 // Login to FreeIPA with uid/passwd and set the FreeIPA session id on the
 // client for subsequent requests.
 func (c *Client) Login(uid, passwd string) (string, error) {
