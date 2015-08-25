@@ -129,9 +129,9 @@ func (c *Client) ChangePassword(uid, old_passwd, new_passwd string) (error) {
 
     status := res.Header.Get("x-ipa-pwchange-result")
     if status == "policy-error"{
-        return ErrPasswordPolicy
+        return &ErrPasswordPolicy{}
     } else if status == "invalid-password" {
-        return ErrInvalidPassword
+        return &ErrInvalidPassword{}
     } else if strings.ToLower(status) != "ok" {
         return errors.New("ipa: change password failed. Unknown status")
     }

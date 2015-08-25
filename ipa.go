@@ -30,8 +30,6 @@ const (
 var (
     ipaCertPool        *x509.CertPool
     ipaSessionPattern  = regexp.MustCompile(`^ipa_session=([0-9a-f]+);`)
-    ErrPasswordPolicy  = errors.New("ipa: password does not conform to policy")
-    ErrInvalidPassword = errors.New("ipa: invalid current password")
 )
 
 // FreeIPA Client
@@ -40,6 +38,22 @@ type Client struct {
     CaCert     string
     KeyTab     string
     session    string
+}
+
+// FreeIPA Password Policy Error
+type ErrPasswordPolicy struct {
+}
+
+func (e *ErrPasswordPolicy) Error() string {
+    return "ipa: password does not conform to policy"
+}
+
+// FreeIPA Invalid Password Error
+type ErrInvalidPassword struct {
+}
+
+func (e *ErrInvalidPassword) Error() string {
+    return "ipa: invalid current password"
 }
 
 // FreeIPA error
@@ -106,6 +120,30 @@ func (dt *IpaDateTime) UnmarshalJSON(b []byte) (error) {
 
     return nil
 }
+
+func (dt *IpaDateTime) UnmarshalBinary(data []byte) error {
+    t := time.Time(*dt)
+    err := t.UnmarshalBinary(data)
+    if err != nil {
+        return err
+    }
+
+    *dt = IpaDateTime(t)
+    return nil
+}
+
+func (dt *IpaDateTime) MarshalBinary() (data []byte, err error) {
+    return time.Time(*dt).MarshalBinary()
+}
+
+func (dt *IpaDateTime) String() string {
+    return time.Time(*dt).String()
+}
+
+func (dt *IpaDateTime) Format(layout string) string {
+    return time.Time(*dt).Format(layout)
+}
+
 
 // Unmarshal a FreeIPA string from an array of strings. Uses the first value
 // in the array as the value of the string.
