@@ -5,65 +5,64 @@
 package ipa
 
 import (
-    "testing"
-    "os"
+	"os"
+	"testing"
 )
 
-func newClient() (*Client) {
-    host := os.Getenv("GOIPA_TEST_HOST")
-    keytab := os.Getenv("GOIPA_TEST_KEYTAB")
+func newClient() *Client {
+	host := os.Getenv("GOIPA_TEST_HOST")
+	keytab := os.Getenv("GOIPA_TEST_KEYTAB")
 
-    return &Client{KeyTab: keytab, Host: host}
+	return &Client{KeyTab: keytab, Host: host}
 }
 
 func TestLogin(t *testing.T) {
-    c := newClient()
-    user := os.Getenv("GOIPA_TEST_USER")
-    pass := os.Getenv("GOIPA_TEST_PASSWD")
-    sess, err := c.Login(user, pass)
-    if err != nil {
-        t.Error(err)
-    }
+	c := newClient()
+	user := os.Getenv("GOIPA_TEST_USER")
+	pass := os.Getenv("GOIPA_TEST_PASSWD")
+	sess, err := c.Login(user, pass)
+	if err != nil {
+		t.Error(err)
+	}
 
-    if len(sess) == 0 {
-        t.Error(err)
-    }
+	if len(sess) == 0 {
+		t.Error(err)
+	}
 }
 
 func TestUserShow(t *testing.T) {
-    c := newClient()
+	c := newClient()
 
-    user := os.Getenv("GOIPA_TEST_USER")
-    pass := os.Getenv("GOIPA_TEST_PASSWD")
-    _, err := c.Login(user, pass)
-    if err != nil {
-        t.Error(err)
-    }
+	user := os.Getenv("GOIPA_TEST_USER")
+	pass := os.Getenv("GOIPA_TEST_PASSWD")
+	_, err := c.Login(user, pass)
+	if err != nil {
+		t.Error(err)
+	}
 
-    // Test using ipa_session
-    rec, err := c.UserShow(user)
+	// Test using ipa_session
+	rec, err := c.UserShow(user)
 
-    if err != nil {
-        t.Error(err)
-    }
+	if err != nil {
+		t.Error(err)
+	}
 
-    if string(rec.Uid) != user {
-        t.Errorf("Invalid user")
-    }
+	if string(rec.Uid) != user {
+		t.Errorf("Invalid user")
+	}
 
-    if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
-        c.ClearSession()
+	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
+		c.ClearSession()
 
-        // Test using keytab if set
-        rec, err := c.UserShow(user)
+		// Test using keytab if set
+		rec, err := c.UserShow(user)
 
-        if err != nil || rec == nil {
-            t.Error(err)
-        }
+		if err != nil || rec == nil {
+			t.Error(err)
+		}
 
-        if string(rec.Uid) != user {
-            t.Errorf("Invalid user")
-        }
-    }
+		if string(rec.Uid) != user {
+			t.Errorf("Invalid user")
+		}
+	}
 }
-
