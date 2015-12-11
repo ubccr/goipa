@@ -2,6 +2,8 @@
 goipa - FreeIPA client library
 ===============================================================================
 
+|godoc|
+
 goipa is a `FreeIPA <http://www.freeipa.org/>`_ client library written in Go.
 It interfaces with the FreeIPA JSON `api <https://git.fedorahosted.org/cgit/freeipa.git/tree/API.txt>`_ 
 over HTTPS.
@@ -40,3 +42,10 @@ License
 ------------------------------------------------------------------------
 
 goipa is released under a BSD style License. See the LICENSE file.
+
+
+
+
+.. |godoc| image:: https://godoc.org/github.com/golang/gddo?status.svg
+    :target: https://godoc.org/github.com/ubccr/goipa
+    :alt: Godoc
