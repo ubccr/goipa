@@ -25,6 +25,8 @@ type UserRecord struct {
 	UidNumber        IpaString   `json:"uidnumber"`
 	GidNumber        IpaString   `json:"gidnumber"`
 	Groups           []string    `json:"memberof_group"`
+	SshPubKeys       []string    `json:"ipasshpubkey"`
+	SshPubKeyFps     []string    `json:"sshpubkeyfp"`
 	HasKeytab        bool        `json:"has_keytab"`
 	HasPassword      bool        `json:"has_password"`
 	Locked           bool        `json:"nsaccountlock"`
@@ -72,6 +74,28 @@ func (c *Client) UserShow(uid string) (*UserRecord, error) {
 	}
 
 	return &userRec, nil
+}
+
+// Update ssh public keys for user uid. Returns the fingerprints on success.
+func (c *Client) UpdateSshPubKeys(uid string, keys []string) ([]string, error) {
+	options := map[string]interface{}{
+		"no_members":   false,
+		"ipasshpubkey": keys,
+		"all":          false}
+
+	res, err := c.rpc("user_mod", []string{uid}, options)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var userRec UserRecord
+	err = json.Unmarshal(res.Result.Data, &userRec)
+	if err != nil {
+		return nil, err
+	}
+
+	return userRec.SshPubKeyFps, nil
 }
 
 // Reset user password and return new random password

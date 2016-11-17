@@ -66,3 +66,42 @@ func TestUserShow(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateSshPubKeys(t *testing.T) {
+	c := newClient()
+
+	user := os.Getenv("GOIPA_TEST_USER")
+	pass := os.Getenv("GOIPA_TEST_PASSWD")
+	_, err := c.Login(user, pass)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Remove any existing public keys
+	fp, err := c.UpdateSshPubKeys(user, []string{})
+	if err != nil {
+		t.Error("Failed to remove existing ssh public keys")
+	}
+
+	if len(fp) != 0 {
+		t.Error("Invalid number of fingerprints returned")
+	}
+
+	_, err = c.UpdateSshPubKeys(user, []string{"invalid key"})
+	if err == nil {
+		t.Error("Invalid key was updated")
+	}
+
+	fp, err = c.UpdateSshPubKeys(user, []string{"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDVBSs8RP8KPbdMwOmuKgjScx301k1mBZTubfcJc7HKcJ19f1Z/eJ5y9R7LjhsK1WGn8ISRtP2c0NUNPWcZHdWzTv6m2AFL4qniXr2vvKcewq2fxy8uXnUSvS054wwFDW6trmWV1Vrrab0eXO9S7tGGLdx2ySQ8Bzfe8wY3M2/N1gd5dzGSVg3qFspgikTKjRt5rfaWoN+/OWLDg1HHEWjY0Hgqry1bJW3U83SlIi9+JwKW0zxunwImgFsI1xC15lf7X9LOE9e6XGT1km/NTPOqoAvaCCA0KyAK7P6cLjFVAA/k9UnC/QX6JKXoURFRdhPEdFqauF3Xw9rwDFCFkMUp test@localhost"})
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(fp) != 1 {
+		t.Errorf("Wrong number of fingerprints returned")
+	}
+
+	if fp[0] != "85:E6:E9:C1:7E:83:25:B9:1B:C0:B8:75:11:15:BD:83 test@localhost (ssh-rsa)" {
+		t.Errorf("Invalid fingerprint")
+	}
+}
