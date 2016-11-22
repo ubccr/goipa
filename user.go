@@ -5,7 +5,9 @@
 package ipa
 
 import (
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,8 +27,8 @@ type UserRecord struct {
 	UidNumber        IpaString   `json:"uidnumber"`
 	GidNumber        IpaString   `json:"gidnumber"`
 	Groups           []string    `json:"memberof_group"`
-	SshPubKeys       []string    `json:"ipasshpubkey"`
-	SshPubKeyFps     []string    `json:"sshpubkeyfp"`
+	SSHPubKeys       []string    `json:"ipasshpubkey"`
+	SSHPubKeyFps     []string    `json:"sshpubkeyfp"`
 	HasKeytab        bool        `json:"has_keytab"`
 	HasPassword      bool        `json:"has_password"`
 	Locked           bool        `json:"nsaccountlock"`
@@ -77,7 +79,7 @@ func (c *Client) UserShow(uid string) (*UserRecord, error) {
 }
 
 // Update ssh public keys for user uid. Returns the fingerprints on success.
-func (c *Client) UpdateSshPubKeys(uid string, keys []string) ([]string, error) {
+func (c *Client) UpdateSSHPubKeys(uid string, keys []string) ([]string, error) {
 	options := map[string]interface{}{
 		"no_members":   false,
 		"ipasshpubkey": keys,
@@ -95,7 +97,7 @@ func (c *Client) UpdateSshPubKeys(uid string, keys []string) ([]string, error) {
 		return nil, err
 	}
 
-	return userRec.SshPubKeyFps, nil
+	return userRec.SSHPubKeyFps, nil
 }
 
 // Reset user password and return new random password
@@ -161,4 +163,65 @@ func (c *Client) ChangePassword(uid, old_passwd, new_passwd string) error {
 	}
 
 	return nil
+}
+
+// Remove TOTP token
+func (c *Client) RemoveOTPToken(uid string) error {
+	options := map[string]interface{}{}
+
+	_, err := c.rpc("otptoken_del", []string{uid}, options)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Add TOTP token. Returns the TOTP URI
+func (c *Client) AddTOTPToken(uid string, algo Algorithm, digits Digits, interval int) (string, error) {
+
+	secret := make([]byte, 20)
+	_, err := rand.Read(secret)
+	if err != nil {
+		return "", err
+	}
+
+	options := map[string]interface{}{
+		"type": "totp",
+		"ipatokenotpkey": map[string]interface{}{
+			"__base64__": base64.StdEncoding.EncodeToString(secret),
+		},
+		"ipatokenotpalgorithm": algo,
+		"ipatokenotpdigits":    digits,
+		"ipatokentotptimestep": interval,
+		"no_qrcode":            true,
+		"qrcode":               false,
+		"no_members":           false,
+		"all":                  false}
+
+	res, err := c.rpc("otptoken_add", []string{uid}, options)
+
+	if err != nil {
+		return "", err
+	}
+
+	var rec map[string]interface{}
+	err = json.Unmarshal(res.Result.Data, &rec)
+	if err != nil {
+		return "", err
+	}
+
+	val, ok := rec["uri"]
+	if !ok {
+		return "", errors.New("URI was not returned from FreeIPA")
+	}
+
+	uri, ok := val.(string)
+
+	if !ok || len(uri) == 0 {
+		return "", errors.New("Invalid URI was returned from FreeIPA")
+	}
+
+	return uri, nil
 }

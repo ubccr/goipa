@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	IPA_CLIENT_VERSION  = "2.101"
-	IPA_DATETIME_FORMAT = "20060102150405Z"
+	IpaClientVersion  = "2.156"
+	IpaDatetimeFormat = "20060102150405Z"
 )
 
 var (
@@ -62,6 +62,24 @@ type IpaError struct {
 	Code    int
 }
 
+// OTP Token hash Algorithm supported by FreeIPA
+type Algorithm string
+
+const (
+	AlgorithmSHA1   Algorithm = "SHA1"
+	AlgorithmSHA256           = "SHA256"
+	AlgorithmSHA384           = "SHA384"
+	AlgorithmSHA512           = "SHA512"
+)
+
+// Number of digits each OTP token code will have
+type Digits int
+
+const (
+	DigitsSix   Digits = 6
+	DigitsEight Digits = 8
+)
+
 // Custom FreeIPA string type
 type IpaString string
 
@@ -71,7 +89,7 @@ type IpaDateTime time.Time
 // Result returned from a FreeIPA JSON rpc call
 type Result struct {
 	Summary string          `json:"summary"`
-	Value   string          `json:"value"`
+	Value   interface{}     `json:"value"`
 	Data    json.RawMessage `json:"result"`
 }
 
@@ -111,7 +129,7 @@ func (dt *IpaDateTime) UnmarshalJSON(b []byte) error {
 	}
 
 	if str, ok := a[0]["__datetime__"]; ok {
-		t, err := time.Parse(IPA_DATETIME_FORMAT, str)
+		t, err := time.Parse(IpaDatetimeFormat, str)
 		if err != nil {
 			return err
 		}
@@ -179,7 +197,7 @@ func (c *Client) ClearSession() {
 }
 
 func (c *Client) rpc(method string, params []string, options map[string]interface{}) (*Response, error) {
-	options["version"] = IPA_CLIENT_VERSION
+	options["version"] = IpaClientVersion
 
 	var data []interface{} = make([]interface{}, 2)
 	data[0] = params
