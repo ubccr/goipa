@@ -29,6 +29,7 @@ type UserRecord struct {
 	Groups           []string    `json:"memberof_group"`
 	SSHPubKeys       []string    `json:"ipasshpubkey"`
 	SSHPubKeyFps     []string    `json:"sshpubkeyfp"`
+	AuthTypes        []string    `json:"ipauserauthtype"`
 	HasKeytab        bool        `json:"has_keytab"`
 	HasPassword      bool        `json:"has_password"`
 	Locked           bool        `json:"nsaccountlock"`
@@ -45,7 +46,16 @@ type UserRecord struct {
 	Randompassword   string      `json:"randompassword"`
 }
 
-// Returns true if the UserRecord is in group
+// Returns true if Two-Factor authentication is the only authentication type
+func (u *UserRecord) TwoFactorOnly() bool {
+	if len(u.AuthTypes) == 1 && u.AuthTypes[0] == "otp" {
+		return true
+	}
+
+	return false
+}
+
+// Returns true if the User is in group
 func (u *UserRecord) HasGroup(group string) bool {
 	for _, g := range u.Groups {
 		if g == group {
@@ -56,7 +66,7 @@ func (u *UserRecord) HasGroup(group string) bool {
 	return false
 }
 
-// Call the FreeIPA user-show method
+// Fetch user details by call the FreeIPA user-show method
 func (c *Client) UserShow(uid string) (*UserRecord, error) {
 
 	options := map[string]interface{}{
