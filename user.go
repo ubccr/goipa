@@ -202,7 +202,7 @@ func (c *Client) AddTOTPToken(uid string, algo Algorithm, digits Digits, interva
 		"ipatokenotpkey": map[string]interface{}{
 			"__base64__": base64.StdEncoding.EncodeToString(secret),
 		},
-		"ipatokenotpalgorithm": algo,
+		"ipatokenotpalgorithm": strings.ToLower(string(algo)),
 		"ipatokenotpdigits":    digits,
 		"ipatokentotptimestep": interval,
 		"no_qrcode":            true,
