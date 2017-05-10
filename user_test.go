@@ -119,8 +119,8 @@ func TestAddTotpToken(t *testing.T) {
 	err = c.RemoveOTPToken(user)
 	if err != nil {
 		if ierr, ok := err.(*IpaError); ok {
-			// 4001 not found is OK anything else is not
-			if ierr.Code != 4001 {
+			// 4001 not found and 2100 Insufficient access is OK anything else is not
+			if ierr.Code != 4001 && ierr.Code != 2100 {
 				t.Error(err)
 			}
 		} else {
@@ -145,5 +145,35 @@ func TestAddTotpToken(t *testing.T) {
 	err = c.RemoveOTPToken(user)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestUpdateMobile(t *testing.T) {
+	c := newClient()
+
+	user := os.Getenv("GOIPA_TEST_USER")
+	pass := os.Getenv("GOIPA_TEST_PASSWD")
+	_, err := c.Login(user, pass)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = c.UpdateMobileNumber(user, "")
+	if err != nil {
+		t.Error("Failed to remove existing mobile number")
+	}
+
+	err = c.UpdateMobileNumber(user, "+9999999999")
+	if err != nil {
+		t.Error(err)
+	}
+
+	rec, err := c.UserShow(user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if string(rec.Mobile) != "+9999999999" {
+		t.Errorf("Invalid mobile number")
 	}
 }
