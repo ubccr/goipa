@@ -62,24 +62,6 @@ type IpaError struct {
 	Code    int
 }
 
-// OTP Token hash Algorithm supported by FreeIPA
-type Algorithm string
-
-const (
-	AlgorithmSHA1   Algorithm = "SHA1"
-	AlgorithmSHA256           = "SHA256"
-	AlgorithmSHA384           = "SHA384"
-	AlgorithmSHA512           = "SHA512"
-)
-
-// Number of digits each OTP token code will have
-type Digits int
-
-const (
-	DigitsSix   Digits = 6
-	DigitsEight Digits = 8
-)
-
 // Custom FreeIPA string type
 type IpaString string
 

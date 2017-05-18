@@ -5,9 +5,7 @@
 package ipa
 
 import (
-	"crypto/rand"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -191,65 +189,4 @@ func (c *Client) ChangePassword(uid, old_passwd, new_passwd string) error {
 	}
 
 	return nil
-}
-
-// Remove TOTP token
-func (c *Client) RemoveOTPToken(uid string) error {
-	options := map[string]interface{}{}
-
-	_, err := c.rpc("otptoken_del", []string{uid}, options)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Add TOTP token. Returns the TOTP URI
-func (c *Client) AddTOTPToken(uid string, algo Algorithm, digits Digits, interval int) (string, error) {
-
-	secret := make([]byte, 20)
-	_, err := rand.Read(secret)
-	if err != nil {
-		return "", err
-	}
-
-	options := map[string]interface{}{
-		"type": "totp",
-		"ipatokenotpkey": map[string]interface{}{
-			"__base64__": base64.StdEncoding.EncodeToString(secret),
-		},
-		"ipatokenotpalgorithm": strings.ToLower(string(algo)),
-		"ipatokenotpdigits":    digits,
-		"ipatokentotptimestep": interval,
-		"no_qrcode":            true,
-		"qrcode":               false,
-		"no_members":           false,
-		"all":                  false}
-
-	res, err := c.rpc("otptoken_add", []string{uid}, options)
-
-	if err != nil {
-		return "", err
-	}
-
-	var rec map[string]interface{}
-	err = json.Unmarshal(res.Result.Data, &rec)
-	if err != nil {
-		return "", err
-	}
-
-	val, ok := rec["uri"]
-	if !ok {
-		return "", errors.New("URI was not returned from FreeIPA")
-	}
-
-	uri, ok := val.(string)
-
-	if !ok || len(uri) == 0 {
-		return "", errors.New("Invalid URI was returned from FreeIPA")
-	}
-
-	return uri, nil
 }

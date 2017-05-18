@@ -106,48 +106,6 @@ func TestUpdateSSHPubKeys(t *testing.T) {
 	}
 }
 
-func TestAddTotpToken(t *testing.T) {
-	c := newClient()
-
-	user := os.Getenv("GOIPA_TEST_USER")
-	pass := os.Getenv("GOIPA_TEST_PASSWD")
-	_, err := c.Login(user, pass)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = c.RemoveOTPToken(user)
-	if err != nil {
-		if ierr, ok := err.(*IpaError); ok {
-			// 4001 not found and 2100 Insufficient access is OK anything else is not
-			if ierr.Code != 4001 && ierr.Code != 2100 {
-				t.Error(err)
-			}
-		} else {
-			t.Error(err)
-		}
-	}
-
-	uri, err := c.AddTOTPToken(user, AlgorithmSHA1, DigitsSix, 30)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(uri) == 0 {
-		t.Error("Invalid URI returned")
-	}
-
-	_, err = c.AddTOTPToken(user, AlgorithmSHA1, DigitsSix, 30)
-	if err == nil {
-		t.Error("Should not be able to set more than 1 OTP")
-	}
-
-	err = c.RemoveOTPToken(user)
-	if err != nil {
-		t.Error(err)
-	}
-}
-
 func TestUpdateMobile(t *testing.T) {
 	c := newClient()
 
