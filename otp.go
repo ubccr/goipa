@@ -36,8 +36,17 @@ type OTPToken struct {
 	TimeStep  IpaString `json:"ipatokentotptimestep"`
 	UUID      IpaString `json:"ipatokenuniqueid"`
 	ManagedBy IpaString `json:"managedby_user"`
+	Disabled  IpaString `json:"ipatokendisabled"`
 	Type      string    `json:"type"`
 	URI       string    `json:"uri"`
+}
+
+func (t *OTPToken) Enabled() bool {
+	if t.Disabled == "TRUE" {
+		return false
+	}
+
+	return true
 }
 
 // Unmarshal a FreeIPA string from an array of strings and convert to an
@@ -141,12 +150,13 @@ func (c *Client) FetchOTPTokens(uid string) ([]*OTPToken, error) {
 }
 
 // Add TOTP token. Returns new OTPToken
-func (c *Client) AddTOTPToken(uid, tokenID string, algo Algorithm, digits Digits, interval int) (*OTPToken, error) {
+func (c *Client) AddTOTPToken(uid, tokenID string, algo Algorithm, digits Digits, interval int, disabled bool) (*OTPToken, error) {
 	options := map[string]interface{}{
 		"type":                 "totp",
 		"ipatokenotpalgorithm": strings.ToLower(string(algo)),
 		"ipatokenotpdigits":    digits,
 		"ipatokentotptimestep": interval,
+		"ipatokendisabled":     disabled,
 		"ipatokenowner":        uid,
 		"no_qrcode":            true,
 		"qrcode":               false,
@@ -166,4 +176,26 @@ func (c *Client) AddTOTPToken(uid, tokenID string, algo Algorithm, digits Digits
 	}
 
 	return &tokenRec, nil
+}
+
+// Enable OTP token.
+func (c *Client) EnableOTPToken(tokenID string) error {
+	options := map[string]interface{}{
+		"ipatokendisabled": false,
+		"all":              false}
+
+	_, err := c.rpc("otptoken_mod", []string{tokenID}, options)
+
+	return err
+}
+
+// Disable OTP token.
+func (c *Client) DisableOTPToken(tokenID string) error {
+	options := map[string]interface{}{
+		"ipatokendisabled": true,
+		"all":              false}
+
+	_, err := c.rpc("otptoken_mod", []string{tokenID}, options)
+
+	return err
 }

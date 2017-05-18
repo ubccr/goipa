@@ -24,7 +24,7 @@ func TestAddTOTPToken(t *testing.T) {
 		t.Error(err)
 	}
 
-	token, err := c.AddTOTPToken(user, "", AlgorithmSHA1, DigitsSix, 30)
+	token, err := c.AddTOTPToken(user, "", AlgorithmSHA1, DigitsSix, 30, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -41,6 +41,10 @@ func TestAddTOTPToken(t *testing.T) {
 		t.Error("Invalid digits returned")
 	}
 
+	if token.Enabled() == true {
+		t.Error("Token should be disabled")
+	}
+
 	tokens, err := c.FetchOTPTokens(user)
 	if err != nil {
 		t.Error(err)
@@ -55,6 +59,27 @@ func TestAddTOTPToken(t *testing.T) {
 
 	if !found {
 		t.Error("New Token not found")
+	}
+
+	err = c.EnableOTPToken(string(token.UUID))
+	if err != nil {
+		t.Error(err)
+	}
+
+	tokens, err = c.FetchOTPTokens(user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	found = false
+	for _, x := range tokens {
+		if x.UUID == token.UUID && x.Enabled() {
+			found = true
+		}
+	}
+
+	if !found {
+		t.Error("Token should now be enabled but was not found")
 	}
 
 	err = c.RemoveOTPToken(string(token.UUID))
