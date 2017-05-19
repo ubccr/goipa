@@ -24,7 +24,7 @@ func TestAddTOTPToken(t *testing.T) {
 		t.Error(err)
 	}
 
-	token, err := c.AddTOTPToken(user, "", AlgorithmSHA1, DigitsSix, 30, true)
+	token, err := c.AddTOTPToken(user, AlgorithmSHA1, DigitsSix, 30)
 	if err != nil {
 		t.Error(err)
 	}
@@ -41,8 +41,8 @@ func TestAddTOTPToken(t *testing.T) {
 		t.Error("Invalid digits returned")
 	}
 
-	if token.Enabled() == true {
-		t.Error("Token should be disabled")
+	if token.Enabled() != true {
+		t.Error("Token should be enabled")
 	}
 
 	tokens, err := c.FetchOTPTokens(user)

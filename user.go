@@ -45,8 +45,8 @@ type UserRecord struct {
 	Randompassword   string      `json:"randompassword"`
 }
 
-// Returns true if Two-Factor authentication is the only authentication type
-func (u *UserRecord) TwoFactorOnly() bool {
+// Returns true if OTP is the only authentication type enabled
+func (u *UserRecord) OTPOnly() bool {
 	if len(u.AuthTypes) == 1 && u.AuthTypes[0] == "otp" {
 		return true
 	}
@@ -186,6 +186,26 @@ func (c *Client) ChangePassword(uid, old_passwd, new_passwd string) error {
 		return &ErrInvalidPassword{}
 	} else if strings.ToLower(status) != "ok" {
 		return errors.New("ipa: change password failed. Unknown status")
+	}
+
+	return nil
+}
+
+// Update user authentication types.
+func (c *Client) SetAuthTypes(uid string, types []string) error {
+	options := map[string]interface{}{
+		"no_members":      false,
+		"ipauserauthtype": types,
+		"all":             false}
+
+	if len(types) == 0 {
+		options["ipauserauthtype"] = ""
+	}
+
+	_, err := c.rpc("user_mod", []string{uid}, options)
+
+	if err != nil {
+		return err
 	}
 
 	return nil

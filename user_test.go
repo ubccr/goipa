@@ -104,6 +104,12 @@ func TestUpdateSSHPubKeys(t *testing.T) {
 	if fp[0] != "85:E6:E9:C1:7E:83:25:B9:1B:C0:B8:75:11:15:BD:83 test@localhost (ssh-rsa)" {
 		t.Errorf("Invalid fingerprint")
 	}
+
+	// Remove test public keys
+	_, err = c.UpdateSSHPubKeys(user, []string{})
+	if err != nil {
+		t.Error("Failed to remove testing ssh public keys")
+	}
 }
 
 func TestUpdateMobile(t *testing.T) {
@@ -133,5 +139,32 @@ func TestUpdateMobile(t *testing.T) {
 
 	if string(rec.Mobile) != "+9999999999" {
 		t.Errorf("Invalid mobile number")
+	}
+}
+
+func TestUserAuthTypes(t *testing.T) {
+	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
+		c := newClient()
+
+		user := os.Getenv("GOIPA_TEST_USER")
+
+		err := c.SetAuthTypes(user, []string{"otp"})
+		if err != nil {
+			t.Error(err)
+		}
+
+		rec, err := c.UserShow(user)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if !rec.OTPOnly() {
+			t.Errorf("User auth type should only be OTP")
+		}
+
+		err = c.SetAuthTypes(user, nil)
+		if err != nil {
+			t.Error("Failed to remove existing auth types")
+		}
 	}
 }

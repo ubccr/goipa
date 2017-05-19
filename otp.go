@@ -150,20 +150,19 @@ func (c *Client) FetchOTPTokens(uid string) ([]*OTPToken, error) {
 }
 
 // Add TOTP token. Returns new OTPToken
-func (c *Client) AddTOTPToken(uid, tokenID string, algo Algorithm, digits Digits, interval int, disabled bool) (*OTPToken, error) {
+func (c *Client) AddTOTPToken(uid string, algo Algorithm, digits Digits, interval int) (*OTPToken, error) {
 	options := map[string]interface{}{
 		"type":                 "totp",
 		"ipatokenotpalgorithm": strings.ToLower(string(algo)),
 		"ipatokenotpdigits":    digits,
 		"ipatokentotptimestep": interval,
-		"ipatokendisabled":     disabled,
 		"ipatokenowner":        uid,
 		"no_qrcode":            true,
 		"qrcode":               false,
 		"no_members":           false,
 		"all":                  true}
 
-	res, err := c.rpc("otptoken_add", []string{tokenID}, options)
+	res, err := c.rpc("otptoken_add", []string{}, options)
 
 	if err != nil {
 		return nil, err
