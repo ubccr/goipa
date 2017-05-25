@@ -153,8 +153,35 @@ func (c *Client) ResetPassword(uid string) (string, error) {
 	return userRec.Randompassword, nil
 }
 
-// Change users password
-func (c *Client) ChangePassword(uid, old_passwd, new_passwd string) error {
+// Change user password. This will run the passwd ipa command. Optionally
+// provide an OTP if required
+func (c *Client) ChangePassword(uid, old_passwd, new_passwd, otpcode string) error {
+
+	options := map[string]interface{}{
+		"current_password": old_passwd,
+		"password":         new_passwd,
+	}
+
+	if len(otpcode) > 0 {
+		options["otp"] = otpcode
+	}
+
+	_, err := c.rpc("passwd", []string{uid}, options)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Set user password. In FreeIPA when a password is first set or when a
+// password is later reset it is marked as immediately expired and requires the
+// owner to perform a password change. This function exists to allow an
+// administrator to use mokey to send a user a link in an email and allow the
+// user to set a new password without it being expired. This is acheived by
+// first calling ResetPassword() then immediately calling this function.
+func (c *Client) SetPassword(uid, old_passwd, new_passwd string) error {
 	ipaUrl := fmt.Sprintf("https://%s/ipa/session/change_password", c.Host)
 
 	form := url.Values{
