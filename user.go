@@ -181,11 +181,12 @@ func (c *Client) ChangePassword(uid, old_passwd, new_passwd, otpcode string) err
 // administrator to use mokey to send a user a link in an email and allow the
 // user to set a new password without it being expired. This is acheived by
 // first calling ResetPassword() then immediately calling this function.
-func (c *Client) SetPassword(uid, old_passwd, new_passwd string) error {
+func (c *Client) SetPassword(uid, old_passwd, new_passwd, otpcode string) error {
 	ipaUrl := fmt.Sprintf("https://%s/ipa/session/change_password", c.Host)
 
 	form := url.Values{
 		"user":         {uid},
+		"otp":          {otpcode},
 		"old_password": {old_passwd},
 		"new_password": {new_passwd}}
 	req, err := http.NewRequest("POST", ipaUrl, strings.NewReader(form.Encode()))
