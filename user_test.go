@@ -80,7 +80,7 @@ func TestUpdateSSHPubKeys(t *testing.T) {
 	// Remove any existing public keys
 	fp, err := c.UpdateSSHPubKeys(user, []string{})
 	if err != nil {
-		t.Error("Failed to remove existing ssh public keys")
+		t.Errorf("Failed to remove existing ssh public keys: %s", err)
 	}
 
 	if len(fp) != 0 {
@@ -101,8 +101,8 @@ func TestUpdateSSHPubKeys(t *testing.T) {
 		t.Errorf("Wrong number of fingerprints returned")
 	}
 
-	if fp[0] != "85:E6:E9:C1:7E:83:25:B9:1B:C0:B8:75:11:15:BD:83 test@localhost (ssh-rsa)" {
-		t.Errorf("Invalid fingerprint")
+	if fp[0] != "SHA256:9NiBLAynn/9d9lNcu/rOh5VXdXIJeA1oJDxfBGsI9xc test@localhost (ssh-rsa)" {
+		t.Errorf("Invalid fingerprint: Got %s", fp[0])
 	}
 
 	// Remove test public keys

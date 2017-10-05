@@ -29,7 +29,7 @@ const (
 
 var (
 	ipaCertPool       *x509.CertPool
-	ipaSessionPattern = regexp.MustCompile(`^ipa_session=([0-9a-f]+);`)
+	ipaSessionPattern = regexp.MustCompile(`^ipa_session=([^;]+);`)
 )
 
 // FreeIPA Client
@@ -293,11 +293,11 @@ func (c *Client) Login(uid, passwd string) (string, error) {
 		ipaSession = matches[1]
 	}
 
-	if len(ipaSession) != 32 {
+	if len(ipaSession) == 32 || strings.HasPrefix(ipaSession, "MagBearerToken") {
+		c.session = ipaSession
+	} else {
 		return "", errors.New("ipa: login failed invalid set-cookie header")
 	}
-
-	c.session = ipaSession
 
 	return ipaSession, nil
 }
