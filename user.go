@@ -238,3 +238,32 @@ func (c *Client) SetAuthTypes(uid string, types []string) error {
 
 	return nil
 }
+
+// Add new user. Note this requires "User Administrators" Privilege in FreeIPA.
+func (c *Client) UserAdd(uid string, email, first, last, homedir, shell string) (*UserRecord, error) {
+	var options = map[string]interface{}{
+		"mail":      email,
+		"givenname": first,
+		"sn":        last}
+
+	if len(homedir) > 0 {
+		options["homedirectory"] = homedir
+	}
+
+	if len(shell) > 0 {
+		options["loginshell"] = shell
+	}
+
+	res, err := c.rpc("user_add", []string{uid}, options)
+	if err != nil {
+		return nil, err
+	}
+
+	var userRec UserRecord
+	err = json.Unmarshal(res.Result.Data, &userRec)
+	if err != nil {
+		return nil, err
+	}
+
+	return &userRec, nil
+}

@@ -168,3 +168,25 @@ func TestUserAuthTypes(t *testing.T) {
 		}
 	}
 }
+
+func TestUserAdd(t *testing.T) {
+	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
+		c := newClient()
+
+		uid := "mokeytestuseraccount"
+		email := "mokey@localhost.localdomain"
+		first := "Walter"
+		last := "White"
+		shell := "/bin/bash"
+		homedir := "/users/mokeytestuseraccount"
+
+		rec, err := c.UserAdd(uid, email, first, last, homedir, shell)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if string(rec.Uid) != uid {
+			t.Errorf("User uid invalid")
+		}
+	}
+}
