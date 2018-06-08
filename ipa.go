@@ -43,6 +43,7 @@ type Client struct {
 	realm      string
 	keyTab     string
 	sessionID  string
+	sticky     bool
 	httpClient *http.Client
 	krbClient  *client.Client
 }
@@ -124,6 +125,7 @@ func NewDefaultClient() *Client {
 	return &Client{
 		host:       ipaDefaultHost,
 		realm:      ipaDefaultRealm,
+		sticky:     true,
 		httpClient: newHTTPClient(),
 	}
 }
@@ -134,6 +136,7 @@ func NewDefaultClientWithSession(sessionID string) *Client {
 		host:       ipaDefaultHost,
 		realm:      ipaDefaultRealm,
 		httpClient: newHTTPClient(),
+		sticky:     true,
 		sessionID:  sessionID,
 	}
 }
@@ -143,6 +146,7 @@ func NewClient(host, realm string) *Client {
 	return &Client{
 		host:       host,
 		realm:      realm,
+		sticky:     true,
 		httpClient: newHTTPClient(),
 	}
 }
@@ -217,11 +221,6 @@ func (s *IpaString) String() string {
 
 func (e *IpaError) Error() string {
 	return fmt.Sprintf("ipa: error %d - %s", e.Code, e.Message)
-}
-
-// Clears out FreeIPA session id
-func (c *Client) ClearSession() {
-	c.sessionID = ""
 }
 
 // Call FreeIPA API with method, params and options
@@ -309,8 +308,22 @@ func (c *Client) SessionID() string {
 	return c.sessionID
 }
 
+// Clears out FreeIPA session id
+func (c *Client) ClearSession() {
+	c.sessionID = ""
+}
+
+// Set stick sessions.
+func (c *Client) StickySession(enable bool) {
+	c.sticky = enable
+}
+
 // Set FreeIPA sessionID from http response cookie
 func (c *Client) setSessionID(res *http.Response) error {
+	if !c.sticky {
+		return nil
+	}
+
 	cookie := res.Header.Get("Set-Cookie")
 	if len(cookie) == 0 {
 		return errors.New("empty set-cookie header")
