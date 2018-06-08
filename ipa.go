@@ -19,7 +19,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ubccr/kerby/khttp"
+	"github.com/go-ini/ini"
+	"gopkg.in/jcmturner/gokrb5.v5/client"
+	"gopkg.in/jcmturner/gokrb5.v5/config"
+	"gopkg.in/jcmturner/gokrb5.v5/keytab"
 )
 
 const (
@@ -28,16 +31,20 @@ const (
 )
 
 var (
+	ipaDefaultHost    string
+	ipaDefaultRealm   string
 	ipaCertPool       *x509.CertPool
 	ipaSessionPattern = regexp.MustCompile(`^ipa_session=([^;]+);`)
 )
 
 // FreeIPA Client
 type Client struct {
-	Host    string
-	CaCert  string
-	KeyTab  string
-	session string
+	host       string
+	realm      string
+	keyTab     string
+	sessionID  string
+	httpClient *http.Client
+	krbClient  *client.Client
 }
 
 // FreeIPA Password Policy Error
@@ -93,6 +100,50 @@ func init() {
 		if !ipaCertPool.AppendCertsFromPEM(pem) {
 			ipaCertPool = nil
 		}
+	}
+
+	// Load default IPA host
+	cfg, err := ini.Load("/etc/ipa/default.conf")
+	if err == nil {
+		ipaDefaultHost = cfg.Section("global").Key("server").MustString("localhost")
+		ipaDefaultRealm = cfg.Section("global").Key("realm").MustString("LOCAL")
+	}
+}
+
+func newHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 1 * time.Minute,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: ipaCertPool},
+		},
+	}
+}
+
+// New default IPA Client using host and realm from /etc/ipa/default.conf
+func NewDefaultClient() *Client {
+	return &Client{
+		host:       ipaDefaultHost,
+		realm:      ipaDefaultRealm,
+		httpClient: newHTTPClient(),
+	}
+}
+
+// New default IPA Client with existing sessionID using host and realm from /etc/ipa/default.conf
+func NewDefaultClientWithSession(sessionID string) *Client {
+	return &Client{
+		host:       ipaDefaultHost,
+		realm:      ipaDefaultRealm,
+		httpClient: newHTTPClient(),
+		sessionID:  sessionID,
+	}
+}
+
+// New IPA Client with host and realm
+func NewClient(host, realm string) *Client {
+	return &Client{
+		host:       host,
+		realm:      realm,
+		httpClient: newHTTPClient(),
 	}
 }
 
@@ -168,16 +219,12 @@ func (e *IpaError) Error() string {
 	return fmt.Sprintf("ipa: error %d - %s", e.Code, e.Message)
 }
 
-// Set FreeIPA session id
-func (c *Client) SetSession(sid string) {
-	c.session = sid
-}
-
 // Clears out FreeIPA session id
 func (c *Client) ClearSession() {
-	c.session = ""
+	c.sessionID = ""
 }
 
+// Call FreeIPA API with method, params and options
 func (c *Client) rpc(method string, params []string, options map[string]interface{}) (*Response, error) {
 	options["version"] = IpaClientVersion
 
@@ -193,29 +240,24 @@ func (c *Client) rpc(method string, params []string, options map[string]interfac
 		return nil, err
 	}
 
-	ipaUrl := fmt.Sprintf("https://%s/ipa/json", c.Host)
-	if len(c.session) > 0 {
-		ipaUrl = fmt.Sprintf("https://%s/ipa/session/json", c.Host)
+	ipaUrl := fmt.Sprintf("https://%s/ipa/json", c.host)
+	if len(c.sessionID) > 0 {
+		ipaUrl = fmt.Sprintf("https://%s/ipa/session/json", c.host)
 	}
 
 	req, err := http.NewRequest("POST", ipaUrl, bytes.NewBuffer(b))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.Host))
+	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.host))
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{RootCAs: ipaCertPool}}
-
-	client := &http.Client{Transport: tr}
-
-	if len(c.session) > 0 {
+	if len(c.sessionID) > 0 {
 		// If session is set, use the session id
-		req.Header.Set("Cookie", fmt.Sprintf("ipa_session=%s", c.session))
-	} else {
-		// default to using Kerberos auth (SPNEGO)
-		client.Transport = &khttp.Transport{Next: tr, KeyTab: c.KeyTab}
+		req.Header.Set("Cookie", fmt.Sprintf("ipa_session=%s", c.sessionID))
+	} else if c.krbClient != nil {
+		// use Kerberos auth (SPNEGO)
+		c.krbClient.SetSPNEGOHeader(req, "")
 	}
 
-	res, err := client.Do(req)
+	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -223,6 +265,10 @@ func (c *Client) rpc(method string, params []string, options map[string]interfac
 
 	if res.StatusCode != 200 {
 		return nil, fmt.Errorf("IPA RPC called failed with HTTP status code: %d", res.StatusCode)
+	}
+
+	if err = c.setSessionID(res); err != nil {
+		return nil, err
 	}
 
 	// XXX use the stream decoder here instead of reading entire body?
@@ -258,33 +304,16 @@ func (c *Client) Ping() (*Response, error) {
 	return res, nil
 }
 
-// Login to FreeIPA with uid/passwd and set the FreeIPA session id on the
-// client for subsequent requests.
-func (c *Client) Login(uid, passwd string) (string, error) {
-	ipaUrl := fmt.Sprintf("https://%s/ipa/session/login_password", c.Host)
+// Return current FreeIPA sessionID
+func (c *Client) SessionID() string {
+	return c.sessionID
+}
 
-	form := url.Values{"user": {uid}, "password": {passwd}}
-	req, err := http.NewRequest("POST", ipaUrl, strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.Host))
-
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{RootCAs: ipaCertPool}}
-	client := &http.Client{Transport: tr}
-
-	res, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		return "", fmt.Errorf("IPA login failed with HTTP status code: %d", res.StatusCode)
-	}
-
+// Set FreeIPA sessionID from http response cookie
+func (c *Client) setSessionID(res *http.Response) error {
 	cookie := res.Header.Get("Set-Cookie")
 	if len(cookie) == 0 {
-		return "", errors.New("ipa: login failed emtpy set-cookie header")
+		return errors.New("empty set-cookie header")
 	}
 
 	ipaSession := ""
@@ -294,10 +323,82 @@ func (c *Client) Login(uid, passwd string) (string, error) {
 	}
 
 	if len(ipaSession) == 32 || strings.HasPrefix(ipaSession, "MagBearerToken") {
-		c.session = ipaSession
+		c.sessionID = ipaSession
 	} else {
-		return "", errors.New("ipa: login failed invalid set-cookie header")
+		return errors.New("invalid set-cookie header")
 	}
 
-	return ipaSession, nil
+	return nil
+}
+
+// Login to FreeIPA using web API with uid/passwd and set the FreeIPA session
+// id on the client for subsequent requests.
+func (c *Client) RemoteLogin(uid, passwd string) error {
+	ipaUrl := fmt.Sprintf("https://%s/ipa/session/login_password", c.host)
+
+	form := url.Values{"user": {uid}, "password": {passwd}}
+	req, err := http.NewRequest("POST", ipaUrl, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.host))
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return fmt.Errorf("IPA login failed with HTTP status code: %d", res.StatusCode)
+	}
+
+	if err = c.setSessionID(res); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Login to FreeIPA using local kerberos login username and password
+func (c *Client) Login(username, password string) error {
+	cfg, err := config.Load("/etc/krb5.conf")
+	if err != nil {
+		return err
+	}
+
+	cl := client.NewClientWithPassword(username, c.realm, password)
+	cl.WithConfig(cfg)
+
+	err = cl.Login()
+	if err != nil {
+		return err
+	}
+
+	c.krbClient = &cl
+
+	return nil
+}
+
+// Login to FreeIPA using local kerberos login with keytab and username
+func (c *Client) LoginWithKeytab(ktab, username string) error {
+	cfg, err := config.Load("/etc/krb5.conf")
+	if err != nil {
+		return err
+	}
+
+	kt, err := keytab.Load(ktab)
+	if err != nil {
+		return err
+	}
+
+	cl := client.NewClientWithKeytab(username, c.realm, kt)
+	cl.WithConfig(cfg)
+
+	err = cl.Login()
+	if err != nil {
+		return err
+	}
+
+	c.krbClient = &cl
+
+	return nil
 }

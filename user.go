@@ -182,7 +182,7 @@ func (c *Client) ChangePassword(uid, old_passwd, new_passwd, otpcode string) err
 // user to set a new password without it being expired. This is acheived by
 // first calling ResetPassword() then immediately calling this function.
 func (c *Client) SetPassword(uid, old_passwd, new_passwd, otpcode string) error {
-	ipaUrl := fmt.Sprintf("https://%s/ipa/session/change_password", c.Host)
+	ipaUrl := fmt.Sprintf("https://%s/ipa/session/change_password", c.host)
 
 	form := url.Values{
 		"user":         {uid},
@@ -191,7 +191,7 @@ func (c *Client) SetPassword(uid, old_passwd, new_passwd, otpcode string) error 
 		"new_password": {new_passwd}}
 	req, err := http.NewRequest("POST", ipaUrl, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.Host))
+	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.host))
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{RootCAs: ipaCertPool}}

@@ -10,16 +10,11 @@ import (
 )
 
 func TestAddTOTPToken(t *testing.T) {
-	c := newClient()
-
 	user := os.Getenv("GOIPA_TEST_USER")
-	pass := os.Getenv("GOIPA_TEST_PASSWD")
-	_, err := c.Login(user, pass)
-	if err != nil {
-		t.Error(err)
-	}
 
-	err = c.RemoveOTPToken("token_does_not_exist")
+	c := newTestClientUserPassword()
+
+	err := c.RemoveOTPToken("token_does_not_exist")
 	if err == nil {
 		t.Error(err)
 	}

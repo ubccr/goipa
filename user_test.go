@@ -9,21 +9,18 @@ import (
 	"testing"
 )
 
-func newClient() *Client {
+func TestRemoteLogin(t *testing.T) {
 	host := os.Getenv("GOIPA_TEST_HOST")
-	keytab := os.Getenv("GOIPA_TEST_KEYTAB")
-
-	return &Client{KeyTab: keytab, Host: host}
-}
-
-func TestLogin(t *testing.T) {
-	c := newClient()
+	realm := os.Getenv("GOIPA_TEST_REALM")
+	c := NewClient(host, realm)
 	user := os.Getenv("GOIPA_TEST_USER")
 	pass := os.Getenv("GOIPA_TEST_PASSWD")
-	sess, err := c.Login(user, pass)
+	err := c.RemoteLogin(user, pass)
 	if err != nil {
 		t.Error(err)
 	}
+
+	sess := c.SessionID()
 
 	if len(sess) == 0 {
 		t.Error(err)
@@ -31,14 +28,8 @@ func TestLogin(t *testing.T) {
 }
 
 func TestUserShow(t *testing.T) {
-	c := newClient()
-
 	user := os.Getenv("GOIPA_TEST_USER")
-	pass := os.Getenv("GOIPA_TEST_PASSWD")
-	_, err := c.Login(user, pass)
-	if err != nil {
-		t.Error(err)
-	}
+	c := newTestClientUserPassword()
 
 	// Test using ipa_session
 	rec, err := c.UserShow(user)
@@ -52,7 +43,7 @@ func TestUserShow(t *testing.T) {
 	}
 
 	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
-		c.ClearSession()
+		c = newTestClientKeytab()
 
 		// Test using keytab if set
 		rec, err := c.UserShow(user)
@@ -68,19 +59,19 @@ func TestUserShow(t *testing.T) {
 }
 
 func TestUpdateSSHPubKeys(t *testing.T) {
-	c := newClient()
-
 	user := os.Getenv("GOIPA_TEST_USER")
-	pass := os.Getenv("GOIPA_TEST_PASSWD")
-	_, err := c.Login(user, pass)
-	if err != nil {
-		t.Error(err)
-	}
+	c := newTestClientUserPassword()
 
 	// Remove any existing public keys
 	fp, err := c.UpdateSSHPubKeys(user, []string{})
 	if err != nil {
-		t.Errorf("Failed to remove existing ssh public keys: %s", err)
+		if ierr, ok := err.(*IpaError); ok {
+			if ierr.Code != 4202 {
+				t.Errorf("Failed to remove existing ssh public keys: %s", err)
+			}
+		} else {
+			t.Errorf("Failed to remove existing ssh public keys: %s", err)
+		}
 	}
 
 	if len(fp) != 0 {
@@ -113,16 +104,10 @@ func TestUpdateSSHPubKeys(t *testing.T) {
 }
 
 func TestUpdateMobile(t *testing.T) {
-	c := newClient()
-
 	user := os.Getenv("GOIPA_TEST_USER")
-	pass := os.Getenv("GOIPA_TEST_PASSWD")
-	_, err := c.Login(user, pass)
-	if err != nil {
-		t.Error(err)
-	}
+	c := newTestClientUserPassword()
 
-	err = c.UpdateMobileNumber(user, "")
+	err := c.UpdateMobileNumber(user, "")
 	if err != nil {
 		t.Error("Failed to remove existing mobile number")
 	}
@@ -144,7 +129,7 @@ func TestUpdateMobile(t *testing.T) {
 
 func TestUserAuthTypes(t *testing.T) {
 	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
-		c := newClient()
+		c := newTestClientKeytab()
 
 		user := os.Getenv("GOIPA_TEST_USER")
 
@@ -171,7 +156,7 @@ func TestUserAuthTypes(t *testing.T) {
 
 func TestUserAdd(t *testing.T) {
 	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
-		c := newClient()
+		c := newTestClientKeytab()
 
 		uid := "mokeytestuseraccount"
 		email := "mokey@localhost.localdomain"

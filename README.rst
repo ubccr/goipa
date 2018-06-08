@@ -16,7 +16,9 @@ Install using go tools::
 
     $ go get github.com/ubccr/goipa
 
-Example calling FreeIPA user-show::
+Example calling FreeIPA user-show:
+
+.. code-block:: go
 
     package main
 
@@ -27,7 +29,12 @@ Example calling FreeIPA user-show::
     )
 
     func main() {
-        c := &ipa.Client{KeyTab: "/path/to/host.keytab", Host: "ipa.example.com"}
+        client := ipa.NewDefaultClient()
+
+        err := client.LoginWithKeytab("/path/to/user.keytab", "username")
+        if err != nil {
+            panic(err)
+        }
 
         rec, err := c.UserShow("uid")
         if err != nil {
@@ -42,8 +49,6 @@ License
 ------------------------------------------------------------------------
 
 goipa is released under a BSD style License. See the LICENSE file.
-
-
 
 
 .. |godoc| image:: https://godoc.org/github.com/golang/gddo?status.svg
