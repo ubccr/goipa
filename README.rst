@@ -36,7 +36,7 @@ Example calling FreeIPA user-show:
             panic(err)
         }
 
-        rec, err := c.UserShow("uid")
+        rec, err := client.UserShow("uid")
         if err != nil {
             panic(err)
         }
