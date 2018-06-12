@@ -155,17 +155,22 @@ func TestUserAuthTypes(t *testing.T) {
 }
 
 func TestUserAdd(t *testing.T) {
-	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
+	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 && len(os.Getenv("GOIPA_TEST_USER_CREATE_UID")) > 0 {
 		c := newTestClientKeytab()
 
-		uid := "mokeytestuseraccount"
-		email := "mokey@localhost.localdomain"
-		first := "Walter"
-		last := "White"
-		shell := "/bin/bash"
-		homedir := "/users/mokeytestuseraccount"
+		uid := os.Getenv("GOIPA_TEST_USER_CREATE_UID")
+		email := os.Getenv("GOIPA_TEST_USER_CREATE_UID") + "@localhost.localdomain"
+		first := "Mokey"
+		last := "Test"
+		homedir := ""
+		shell := ""
+		password := ""
 
-		rec, err := c.UserAdd(uid, email, first, last, homedir, shell)
+		if len(os.Getenv("GOIPA_TEST_USER_CREATE_PASSWD")) > 0 {
+			password = os.Getenv("GOIPA_TEST_USER_CREATE_PASSWD")
+		}
+
+		rec, err := c.UserAdd(uid, password, email, first, last, homedir, shell)
 		if err != nil {
 			t.Fatal(err)
 		}

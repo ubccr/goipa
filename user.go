@@ -177,10 +177,14 @@ func (c *Client) ChangePassword(uid, old_passwd, new_passwd, otpcode string) err
 
 // Set user password. In FreeIPA when a password is first set or when a
 // password is later reset it is marked as immediately expired and requires the
-// owner to perform a password change. This function exists to allow an
-// administrator to use mokey to send a user a link in an email and allow the
-// user to set a new password without it being expired. This is acheived by
-// first calling ResetPassword() then immediately calling this function.
+// owner to perform a password change. See here
+// https://www.freeipa.org/page/New_Passwords_Expired for more details. This
+// function exists to circumvent the "new passwords expired" feature of FreeIPA
+// and allow an administrator to set a new password for a user without it being
+// expired. This is acheived, for example, by first calling ResetPassword()
+// then immediately calling this function. *WARNING* See
+// https://www.freeipa.org/page/Self-Service_Password_Reset for security issues
+// and possible weaknesses of this approach.
 func (c *Client) SetPassword(uid, old_passwd, new_passwd, otpcode string) error {
 	ipaUrl := fmt.Sprintf("https://%s/ipa/session/change_password", c.host)
 
@@ -239,8 +243,10 @@ func (c *Client) SetAuthTypes(uid string, types []string) error {
 	return nil
 }
 
-// Add new user. Note this requires "User Administrators" Privilege in FreeIPA.
-func (c *Client) UserAdd(uid string, email, first, last, homedir, shell string) (*UserRecord, error) {
+// Add new user. If password is provided, the users password is first reset
+// then changed to password. See SetPassword for more details. Note this
+// requires "User Administrators" Privilege in FreeIPA.
+func (c *Client) UserAdd(uid, password, email, first, last, homedir, shell string) (*UserRecord, error) {
 	var options = map[string]interface{}{
 		"mail":      email,
 		"givenname": first,
@@ -254,6 +260,10 @@ func (c *Client) UserAdd(uid string, email, first, last, homedir, shell string) 
 		options["loginshell"] = shell
 	}
 
+	if len(password) > 0 {
+		options["random"] = true
+	}
+
 	res, err := c.rpc("user_add", []string{uid}, options)
 	if err != nil {
 		return nil, err
@@ -263,6 +273,13 @@ func (c *Client) UserAdd(uid string, email, first, last, homedir, shell string) 
 	err = json.Unmarshal(res.Result.Data, &userRec)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(password) > 0 && len(userRec.Randompassword) > 0 {
+		err := c.SetPassword(uid, userRec.Randompassword, password, "")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &userRec, nil
