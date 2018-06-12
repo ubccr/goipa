@@ -164,30 +164,28 @@ func TestUserAdd(t *testing.T) {
 		last := "Test"
 		homedir := ""
 		shell := ""
-		password := ""
+		random := false
 
 		if len(os.Getenv("GOIPA_TEST_USER_CREATE_PASSWD")) > 0 {
-			password = os.Getenv("GOIPA_TEST_USER_CREATE_PASSWD")
-
-			// Test password checker
-			c.SetPasswordMinLength(8)
-			c.SetPasswordCharacterClasses(2)
-			_, err := c.UserAdd(uid, "bad", email, first, last, homedir, shell)
-			if err == nil {
-				t.Fatal(err)
-			}
-			if _, ok := err.(*ErrPasswordPolicy); !ok {
-				t.Fatal(err)
-			}
+			random = true
 		}
 
-		rec, err := c.UserAdd(uid, password, email, first, last, homedir, shell)
+		rec, err := c.UserAdd(uid, email, first, last, homedir, shell, random)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		if string(rec.Uid) != uid {
 			t.Errorf("User uid invalid")
+		}
+
+		if random {
+			// Set password
+			password := os.Getenv("GOIPA_TEST_USER_CREATE_PASSWD")
+			err := c.SetPassword(uid, rec.Randompassword, password, "")
+			if err != nil {
+				t.Errorf("Failed to set user password")
+			}
 		}
 	}
 }

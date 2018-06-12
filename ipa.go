@@ -39,15 +39,13 @@ var (
 
 // FreeIPA Client
 type Client struct {
-	host            string
-	realm           string
-	keyTab          string
-	sessionID       string
-	sticky          bool
-	passCharClasses int
-	passMinLength   int
-	httpClient      *http.Client
-	krbClient       *client.Client
+	host       string
+	realm      string
+	keyTab     string
+	sessionID  string
+	sticky     bool
+	httpClient *http.Client
+	krbClient  *client.Client
 }
 
 // FreeIPA Password Policy Error
@@ -318,16 +316,6 @@ func (c *Client) ClearSession() {
 // Set stick sessions.
 func (c *Client) StickySession(enable bool) {
 	c.sticky = enable
-}
-
-// Set min password length
-func (c *Client) SetPasswordMinLength(size int) {
-	c.passMinLength = size
-}
-
-// Set min character classes for passwords
-func (c *Client) SetPasswordCharacterClasses(size int) {
-	c.passCharClasses = size
 }
 
 // Set FreeIPA sessionID from http response cookie

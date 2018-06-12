@@ -11,15 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
-)
-
-var (
-	lower  = regexp.MustCompile(`[a-z]`)
-	upper  = regexp.MustCompile(`[A-Z]`)
-	number = regexp.MustCompile(`[0-9]`)
-	marks  = regexp.MustCompile(`[^0-9a-zA-Z]`)
 )
 
 // UserRecord encapsulates user data returned from ipa user commands
@@ -251,15 +243,9 @@ func (c *Client) SetAuthTypes(uid string, types []string) error {
 	return nil
 }
 
-// Add new user. If password is provided, the users password is first reset
-// then changed to password. See SetPassword for more details. Note this
-// requires "User Administrators" Privilege in FreeIPA. *WARNING* The password
-// is set after the account is created. If the password does not conform to the
-// password policy then it will not be set but the account will still get
-// created. To minimize the chances of this happening set SetPasswordMinLength
-// and SetPasswordCharacterClasses to run a check on the password before
-// creating the account.
-func (c *Client) UserAdd(uid, password, email, first, last, homedir, shell string) (*UserRecord, error) {
+// Add new user. If random is true a random password will be created for the
+// user. Note this requires "User Administrators" Privilege in FreeIPA.
+func (c *Client) UserAdd(uid, email, first, last, homedir, shell string, random bool) (*UserRecord, error) {
 	var options = map[string]interface{}{
 		"mail":      email,
 		"givenname": first,
@@ -273,12 +259,7 @@ func (c *Client) UserAdd(uid, password, email, first, last, homedir, shell strin
 		options["loginshell"] = shell
 	}
 
-	if len(password) > 0 {
-		// Run a simple password check before creating user account.
-		err := c.checkPassword(password)
-		if err != nil {
-			return nil, err
-		}
+	if random {
 		options["random"] = true
 	}
 
@@ -293,45 +274,5 @@ func (c *Client) UserAdd(uid, password, email, first, last, homedir, shell strin
 		return nil, err
 	}
 
-	if len(password) > 0 && len(userRec.Randompassword) > 0 {
-		err := c.SetPassword(uid, userRec.Randompassword, password, "")
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return &userRec, nil
-}
-
-// Simple password checker to validate passwords before creating an account
-func (c *Client) checkPassword(pass string) error {
-	if c.passMinLength > 0 {
-		l := len([]rune(pass))
-		if l < c.passMinLength {
-			return &ErrPasswordPolicy{}
-		}
-	}
-
-	if c.passCharClasses > 0 {
-		typ := 0
-
-		if lower.MatchString(pass) {
-			typ++
-		}
-		if upper.MatchString(pass) {
-			typ++
-		}
-		if number.MatchString(pass) {
-			typ++
-		}
-		if marks.MatchString(pass) {
-			typ++
-		}
-
-		if typ < c.passCharClasses {
-			return &ErrPasswordPolicy{}
-		}
-	}
-
-	return nil
 }
