@@ -225,6 +225,10 @@ func (e *IpaError) Error() string {
 
 // Call FreeIPA API with method, params and options
 func (c *Client) rpc(method string, params []string, options map[string]interface{}) (*Response, error) {
+	if options == nil {
+		options = map[string]interface{}{}
+	}
+
 	options["version"] = IpaClientVersion
 
 	var data []interface{} = make([]interface{}, 2)

@@ -30,7 +30,7 @@ type UserRecord struct {
 	AuthTypes        []string    `json:"ipauserauthtype"`
 	HasKeytab        bool        `json:"has_keytab"`
 	HasPassword      bool        `json:"has_password"`
-	Locked           bool        `json:"nsaccountlock"`
+	NSAccountLock    bool        `json:"nsaccountlock"`
 	HomeDir          IpaString   `json:"homedirectory"`
 	Email            IpaString   `json:"mail"`
 	Mobile           IpaString   `json:"mobile"`
@@ -63,6 +63,11 @@ func (u *UserRecord) HasGroup(group string) bool {
 	}
 
 	return false
+}
+
+// Returns true if the User is locked
+func (u *UserRecord) Locked() bool {
+	return u.NSAccountLock
 }
 
 // Fetch user details by call the FreeIPA user-show method
@@ -235,6 +240,28 @@ func (c *Client) SetAuthTypes(uid string, types []string) error {
 	}
 
 	_, err := c.rpc("user_mod", []string{uid}, options)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Disable User Account
+func (c *Client) UserDisable(uid string) error {
+	_, err := c.rpc("user_disable", []string{uid}, nil)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Enable User Account
+func (c *Client) UserEnable(uid string) error {
+	_, err := c.rpc("user_enable", []string{uid}, nil)
 
 	if err != nil {
 		return err

@@ -189,3 +189,54 @@ func TestUserAdd(t *testing.T) {
 		}
 	}
 }
+
+func TestUserLock(t *testing.T) {
+	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 && len(os.Getenv("GOIPA_TEST_USER")) > 0 {
+		c := newTestClientKeytab()
+
+		user := os.Getenv("GOIPA_TEST_USER")
+		pass := os.Getenv("GOIPA_TEST_PASSWD")
+
+		rec, err := c.UserShow(user)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if rec.Locked() {
+			t.Errorf("Account not be disabled")
+		}
+
+		err = c.UserDisable(user)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rec, err = c.UserShow(user)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !rec.Locked() {
+			t.Errorf("Account should be disabled")
+		}
+
+		err = c.RemoteLogin(user, pass)
+		if err == nil {
+			t.Errorf("User should not be able to login")
+		}
+
+		err = c.UserEnable(user)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rec, err = c.UserShow(user)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if rec.Locked() {
+			t.Errorf("Account should not be disabled")
+		}
+	}
+}
