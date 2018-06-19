@@ -79,12 +79,12 @@
     "pac",
     "types"
   ]
-  revision = "b7336d9b230f10c8436b1a932b454ab044232e22"
-  version = "v5.1.0"
+  revision = "5502bb09507bcc91e28c9b6feba046beb2e007d1"
+  version = "v5.2.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d6feaaa74e59c5e0b7a4f627f36da4dcb7473a950150f2b301146011ddde1ba9"
+  inputs-digest = "da98a40ff84a6af94565b951dff2208cebe96ee30061457120af79f6a46c9933"
   solver-name = "gps-cdcl"
   solver-version = 1
