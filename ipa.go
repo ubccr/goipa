@@ -151,6 +151,16 @@ func NewClient(host, realm string) *Client {
 	}
 }
 
+// New IPA Client with host, realm and custom http client
+func NewClientCustomHttp(host, realm string, httpClient *http.Client) *Client {
+	return &Client{
+		host:       host,
+		realm:      realm,
+		sticky:     true,
+		httpClient: httpClient,
+	}
+}
+
 // Unmarshal a FreeIPA datetime. Datetimes in FreeIPA are returned using a
 // class-hint system. Values are stored as an array with a single element
 // indicating the type and value, for example, '[{"__datetime__": "YYYY-MM-DDTHH:MM:SSZ"]}'
