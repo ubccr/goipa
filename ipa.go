@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"github.com/go-ini/ini"
-	"gopkg.in/jcmturner/gokrb5.v5/client"
-	"gopkg.in/jcmturner/gokrb5.v5/config"
-	"gopkg.in/jcmturner/gokrb5.v5/keytab"
+	"gopkg.in/jcmturner/gokrb5.v6/client"
+	"gopkg.in/jcmturner/gokrb5.v6/config"
+	"gopkg.in/jcmturner/gokrb5.v6/keytab"
 )
 
 const (
