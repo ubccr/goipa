@@ -36,6 +36,7 @@ func TestUserShow(t *testing.T) {
 
 	if err != nil {
 		t.Error(err)
+		t.FailNow()
 	}
 
 	if string(rec.Uid) != user {

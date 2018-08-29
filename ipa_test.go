@@ -13,7 +13,7 @@ import (
 func newTestClientUserPassword() *Client {
 	host := os.Getenv("GOIPA_TEST_HOST")
 	username := os.Getenv("GOIPA_TEST_USER")
-	password := os.Getenv("GOIPA_TEST_PASSWORD")
+	password := os.Getenv("GOIPA_TEST_PASSWD")
 	realm := os.Getenv("GOIPA_TEST_REALM")
 
 	c := NewClient(host, realm)

@@ -75,16 +75,21 @@
     "krberror",
     "messages",
     "mstypes",
-    "ndr",
     "pac",
     "types"
   ]
-  revision = "5502bb09507bcc91e28c9b6feba046beb2e007d1"
-  version = "v5.2.0"
+  revision = "32ba44ca5b42f17a4a9f33ff4305e70665a1bc0f"
+  version = "v5.3.0"
+
+[[projects]]
+  name = "gopkg.in/jcmturner/rpc.v0"
+  packages = ["ndr"]
+  revision = "4480c480c9cd343b54b0acb5b62261cbd33d7adf"
+  version = "v0.0.2"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "da98a40ff84a6af94565b951dff2208cebe96ee30061457120af79f6a46c9933"
+  inputs-digest = "d61d595ce71ec46d768b4f323cdc14c662c2c993a2bb3bc5b84464da657ab306"
   solver-name = "gps-cdcl"
   solver-version = 1
