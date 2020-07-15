@@ -1,5 +1,7 @@
 module github.com/ubccr/goipa
 
+go 1.14
+
 require (
 	github.com/go-ini/ini v1.37.0
 	github.com/hashicorp/go-uuid v0.0.0-20180228145832-27454136f036 // indirect

@@ -340,7 +340,7 @@ func (c *Client) setSessionID(res *http.Response) error {
 
 	cookie := res.Header.Get("Set-Cookie")
 	if len(cookie) == 0 {
-		return errors.New("empty set-cookie header")
+		return nil
 	}
 
 	ipaSession := ""
