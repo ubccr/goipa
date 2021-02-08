@@ -106,7 +106,7 @@ func init() {
 	// Load default IPA host
 	cfg, err := ini.Load("/etc/ipa/default.conf")
 	if err == nil {
-		ipaDefaultHost = cfg.Section("global").Key("server").MustString("localhost")
+		ipaDefaultHost = cfg.Section("global").Key("host").MustString("localhost")
 		ipaDefaultRealm = cfg.Section("global").Key("realm").MustString("LOCAL")
 	}
 }
