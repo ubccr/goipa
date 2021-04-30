@@ -6,6 +6,9 @@ package ipa
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -197,4 +200,36 @@ func (c *Client) DisableOTPToken(tokenID string) error {
 	_, err := c.rpc("otptoken_mod", []string{tokenID}, options)
 
 	return err
+}
+
+// SyncTOTPToken Returns error
+func (c *Client) SyncTOTPToken(uid, passwd, firstCode, secondCode string) error {
+	ipaURL := fmt.Sprintf("https://%s/ipa/session/sync_token", c.host)
+	form := url.Values{
+		"user":        {uid},
+		"password":    {passwd},
+		"first_code":  {firstCode},
+		"second_code": {secondCode},
+	}
+	req, err := http.NewRequest("POST", ipaURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.host))
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return fmt.Errorf("IPA sync token failed with HTTP status code: %d", res.StatusCode)
+	}
+
+	if res.Header.Get("X-Ipa-Tokensync-Result") == "invalid-credentials" {
+		return fmt.Errorf("User/Pass/Token is invalid")
+	}
+
+	return nil
 }
