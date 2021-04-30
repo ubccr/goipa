@@ -92,6 +92,31 @@ func (c *Client) UserShow(uid string) (*UserRecord, error) {
 	return &userRec, nil
 }
 
+// UsersFindBy looking for users using search attributes
+// For example, searchParams["mail"] = "SomeOne@mail.example"
+func (c *Client) UsersFindBy(searchParams map[string]interface{}) ([]string, error) {
+	options := searchParams
+
+	res, err := c.rpc("user_find", []string{""}, options)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var userRec []UserRecord
+	err = json.Unmarshal(res.Result.Data, &userRec)
+	if err != nil {
+		return nil, err
+	}
+
+	result := []string{}
+	for _, value := range userRec {
+		result = append(result, value.Uid.String())
+	}
+
+	return result, nil
+}
+
 // Update ssh public keys for user uid. Returns the fingerprints on success.
 func (c *Client) UpdateSSHPubKeys(uid string, keys []string) ([]string, error) {
 	options := map[string]interface{}{
