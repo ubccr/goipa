@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 )
 
 type GroupRecord struct {
@@ -80,6 +81,22 @@ func (c *Client) GroupShow(cn string) (*GroupRecord, error) {
 	}
 
 	return groupRec, nil
+}
+
+func (c *Client) CheckGroupExist(cn string) (bool, error) {
+	_, err := c.GroupShow(cn)
+
+	re := regexp.MustCompile(`group not found`)
+	isGroupNotFoundError := re.Match([]byte(err.Error()))
+	if isGroupNotFoundError {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (c *Client) AddUserToGroup(groupCn string, userUid string) (*GroupRecord, error) {

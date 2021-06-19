@@ -113,6 +113,16 @@ func TestGroup(t *testing.T) {
 	}
 	t.Logf("Deleted group %s from freeipa\n", groupName)
 
+	groupExist, err := c.CheckGroupExist(groupName)
+	if err != nil {
+		t.Error(err)
+	}
+	if groupExist {
+		t.Logf("Group %s was not removed\n", groupName)
+		t.Error(err)
+	}
+	t.Logf("Checked group %s deletion from freeipa\n", groupName)
+
 	tearDown(users, c)
 	t.Log("Deleted users from freeipa", users)
 }
