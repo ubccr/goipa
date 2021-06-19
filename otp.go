@@ -6,6 +6,7 @@ package ipa
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 )
 
@@ -112,7 +113,7 @@ func (d *Digits) UnmarshalJSON(b []byte) error {
 }
 
 func (d *Digits) String() string {
-	return string(*d)
+	return strconv.Itoa(int(*d))
 }
 
 // Remove OTP token
