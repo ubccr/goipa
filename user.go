@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -314,4 +315,20 @@ func (c *Client) UserDelete(uid string) error {
 	}
 
 	return nil
+}
+
+func (c *Client) CheckUserExist(uid string) (bool, error) {
+	_, err := c.UserShow(uid)
+
+	if err != nil {
+		re := regexp.MustCompile(`user not found`)
+		isUserNotFoundError := re.Match([]byte(err.Error()))
+		if isUserNotFoundError {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+
+	return true, nil
 }
