@@ -8,7 +8,6 @@ package ipa
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"regexp"
 )
 
@@ -23,12 +22,13 @@ type GroupRecord struct {
 
 var ErrorGroupRecordNotInitialized = errors.New("group record is not initialized")
 
-func (g *GroupRecord) getCn() (string, error) {
-	var cn string
+func (g *GroupRecord) GetUsers() ([]string, error) {
+	var users []string
 	if len(g.Cn) <= 0 {
-		return cn, ErrorGroupRecordNotInitialized
+		return users, ErrorGroupRecordNotInitialized
 	}
-	return g.Cn[0], nil
+	users = g.Users
+	return users, nil
 }
 
 func (c *Client) GroupAdd(cn string) (*GroupRecord, error) {
@@ -86,14 +86,15 @@ func (c *Client) GroupShow(cn string) (*GroupRecord, error) {
 func (c *Client) CheckGroupExist(cn string) (bool, error) {
 	_, err := c.GroupShow(cn)
 
-	re := regexp.MustCompile(`group not found`)
-	isGroupNotFoundError := re.Match([]byte(err.Error()))
-	if isGroupNotFoundError {
-		return false, nil
-	}
-
 	if err != nil {
-		return false, err
+		re := regexp.MustCompile(`group not found`)
+		isGroupNotFoundError := re.Match([]byte(err.Error()))
+		if isGroupNotFoundError {
+			return false, nil
+		} else {
+			return false, err
+		}
+
 	}
 
 	return true, nil
@@ -113,8 +114,6 @@ func (c *Client) AddUserToGroup(groupCn string, userUid string) (*GroupRecord, e
 	if err != nil {
 		return groupRec, err
 	}
-
-	fmt.Printf("%s\n", res.Result.Data)
 
 	err = json.Unmarshal(res.Result.Data, &groupRec)
 	if err != nil {
