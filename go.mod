@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/go-ini/ini v1.37.0
+	github.com/google/uuid v1.2.0 // indirect
 	github.com/hashicorp/go-uuid v0.0.0-20180228145832-27454136f036 // indirect
 	github.com/jcmturner/gofork v0.0.0-20180107083740-2aebee971930 // indirect
 	golang.org/x/crypto v0.0.0-20180820150726-614d502a4dac // indirect
