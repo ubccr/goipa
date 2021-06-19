@@ -303,3 +303,15 @@ func (c *Client) UserAdd(uid, email, first, last, homedir, shell string, random 
 
 	return &userRec, nil
 }
+
+func (c *Client) UserDelete(uid string) error {
+	var options = map[string]interface{}{
+		"continue": false}
+
+	_, err := c.rpc("user_del", []string{uid}, options)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
