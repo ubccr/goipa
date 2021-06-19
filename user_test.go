@@ -108,12 +108,12 @@ func TestUpdateMobile(t *testing.T) {
 	user := os.Getenv("GOIPA_TEST_USER")
 	c := newTestClientUserPassword()
 
-	err := c.UpdateMobileNumber(user, "")
+	err := c.UpdateTelephoneNumber(user, "")
 	if err != nil {
 		t.Error("Failed to remove existing mobile number")
 	}
 
-	err = c.UpdateMobileNumber(user, "+9999999999")
+	err = c.UpdateTelephoneNumber(user, "+9999999999")
 	if err != nil {
 		t.Error(err)
 	}
@@ -123,7 +123,7 @@ func TestUpdateMobile(t *testing.T) {
 		t.Error(err)
 	}
 
-	if string(rec.Mobile) != "+9999999999" {
+	if string(rec.TelephoneNumber) != "+9999999999" {
 		t.Errorf("Invalid mobile number")
 	}
 }
