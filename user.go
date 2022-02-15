@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -33,7 +34,7 @@ type UserRecord struct {
 	NSAccountLock    bool        `json:"nsaccountlock"`
 	HomeDir          IpaString   `json:"homedirectory"`
 	Email            IpaString   `json:"mail"`
-	Mobile           IpaString   `json:"mobile"`
+	TelephoneNumber  IpaString   `json:"telephonenumber"`
 	Shell            IpaString   `json:"loginshell"`
 	SudoRules        IpaString   `json:"memberofindirect_sudorule"`
 	HbacRules        IpaString   `json:"memberofindirect_hbacrule"`
@@ -116,11 +117,11 @@ func (c *Client) UpdateSSHPubKeys(uid string, keys []string) ([]string, error) {
 
 // Update mobile number. Currently will store only a single number. Any
 // existing numbers will be overwritten.
-func (c *Client) UpdateMobileNumber(uid string, number string) error {
+func (c *Client) UpdateTelephoneNumber(uid string, number string) error {
 	options := map[string]interface{}{
-		"no_members": false,
-		"mobile":     []string{number},
-		"all":        false}
+		"no_members":      false,
+		"telephonenumber": []string{number},
+		"all":             false}
 
 	_, err := c.rpc("user_mod", []string{uid}, options)
 
@@ -302,4 +303,32 @@ func (c *Client) UserAdd(uid, email, first, last, homedir, shell string, random 
 	}
 
 	return &userRec, nil
+}
+
+func (c *Client) UserDelete(uid string) error {
+	var options = map[string]interface{}{
+		"continue": false}
+
+	_, err := c.rpc("user_del", []string{uid}, options)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) CheckUserExist(uid string) (bool, error) {
+	_, err := c.UserShow(uid)
+
+	if err != nil {
+		re := regexp.MustCompile(`user not found`)
+		isUserNotFoundError := re.Match([]byte(err.Error()))
+		if isUserNotFoundError {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+
+	return true, nil
 }
