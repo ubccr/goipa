@@ -216,6 +216,10 @@ func (dt *IpaDateTime) String() string {
 	return time.Time(*dt).String()
 }
 
+func (dt *IpaDateTime) IsZero() bool {
+	return time.Time(*dt).IsZero()
+}
+
 func (dt *IpaDateTime) Format(layout string) string {
 	return time.Time(*dt).Format(layout)
 }
