@@ -2,34 +2,20 @@
 // Use of this source code is governed by a BSD style
 // license that can be found in the LICENSE file.
 
-package ipa
+package ipa_test
 
 import (
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/ubccr/goipa"
 )
-
-func TestRemoteLogin(t *testing.T) {
-	host := os.Getenv("GOIPA_TEST_HOST")
-	realm := os.Getenv("GOIPA_TEST_REALM")
-	c := NewClient(host, realm)
-	user := os.Getenv("GOIPA_TEST_USER")
-	pass := os.Getenv("GOIPA_TEST_PASSWD")
-	err := c.RemoteLogin(user, pass)
-	if err != nil {
-		t.Error(err)
-	}
-
-	sess := c.SessionID()
-
-	if len(sess) == 0 {
-		t.Error(err)
-	}
-}
 
 func TestUserShow(t *testing.T) {
 	user := os.Getenv("GOIPA_TEST_USER")
-	c := newTestClientUserPassword()
+	c, err := newTestClientUserPassword()
+	require.NoError(t, err)
 
 	// Test using ipa_session
 	rec, err := c.UserShow(user)
@@ -44,7 +30,8 @@ func TestUserShow(t *testing.T) {
 	}
 
 	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
-		c = newTestClientKeytab()
+		c, err = newTestClientKeytab()
+		require.NoError(t, err)
 
 		// Test using keytab if set
 		rec, err := c.UserShow(user)
@@ -61,12 +48,13 @@ func TestUserShow(t *testing.T) {
 
 func TestUpdateSSHPubKeys(t *testing.T) {
 	user := os.Getenv("GOIPA_TEST_USER")
-	c := newTestClientUserPassword()
+	c, err := newTestClientUserPassword()
+	require.NoError(t, err)
 
 	// Remove any existing public keys
 	fp, err := c.UpdateSSHPubKeys(user, []string{})
 	if err != nil {
-		if ierr, ok := err.(*IpaError); ok {
+		if ierr, ok := err.(*ipa.IpaError); ok {
 			if ierr.Code != 4202 {
 				t.Errorf("Failed to remove existing ssh public keys: %s", err)
 			}
@@ -106,9 +94,10 @@ func TestUpdateSSHPubKeys(t *testing.T) {
 
 func TestUpdateMobile(t *testing.T) {
 	user := os.Getenv("GOIPA_TEST_USER")
-	c := newTestClientUserPassword()
+	c, err := newTestClientUserPassword()
+	require.NoError(t, err)
 
-	err := c.UpdateMobileNumber(user, "")
+	err = c.UpdateMobileNumber(user, "")
 	if err != nil {
 		t.Error("Failed to remove existing mobile number")
 	}
@@ -130,11 +119,12 @@ func TestUpdateMobile(t *testing.T) {
 
 func TestUserAuthTypes(t *testing.T) {
 	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
-		c := newTestClientKeytab()
+		c, err := newTestClientKeytab()
+		require.NoError(t, err)
 
 		user := os.Getenv("GOIPA_TEST_USER")
 
-		err := c.SetAuthTypes(user, []string{"otp"})
+		err = c.SetAuthTypes(user, []string{"otp"})
 		if err != nil {
 			t.Error(err)
 		}
@@ -157,7 +147,8 @@ func TestUserAuthTypes(t *testing.T) {
 
 func TestUserAdd(t *testing.T) {
 	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 && len(os.Getenv("GOIPA_TEST_USER_CREATE_UID")) > 0 {
-		c := newTestClientKeytab()
+		c, err := newTestClientKeytab()
+		require.NoError(t, err)
 
 		uid := os.Getenv("GOIPA_TEST_USER_CREATE_UID")
 		email := os.Getenv("GOIPA_TEST_USER_CREATE_UID") + "@localhost.localdomain"
@@ -193,7 +184,8 @@ func TestUserAdd(t *testing.T) {
 
 func TestUserLock(t *testing.T) {
 	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 && len(os.Getenv("GOIPA_TEST_USER")) > 0 {
-		c := newTestClientKeytab()
+		c, err := newTestClientKeytab()
+		require.NoError(t, err)
 
 		user := os.Getenv("GOIPA_TEST_USER")
 		pass := os.Getenv("GOIPA_TEST_PASSWD")

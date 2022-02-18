@@ -2,24 +2,28 @@
 // Use of this source code is governed by a BSD style
 // license that can be found in the LICENSE file.
 
-package ipa
+package ipa_test
 
 import (
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/ubccr/goipa"
 )
 
 func TestAddTOTPToken(t *testing.T) {
 	user := os.Getenv("GOIPA_TEST_USER")
 
-	c := newTestClientUserPassword()
+	c, err := newTestClientUserPassword()
+	require.NoError(t, err)
 
-	err := c.RemoveOTPToken("token_does_not_exist")
+	err = c.RemoveOTPToken("token_does_not_exist")
 	if err == nil {
 		t.Error(err)
 	}
 
-	token, err := c.AddTOTPToken(user, AlgorithmSHA1, DigitsSix, 30)
+	token, err := c.AddTOTPToken(user, ipa.AlgorithmSHA1, ipa.DigitsSix, 30)
 	if err != nil {
 		t.Error(err)
 	}
@@ -28,11 +32,11 @@ func TestAddTOTPToken(t *testing.T) {
 		t.Error("Invalid URI returned")
 	}
 
-	if token.Algorithm != AlgorithmSHA1 {
+	if token.Algorithm != ipa.AlgorithmSHA1 {
 		t.Error("Invalid algorithm returned")
 	}
 
-	if token.Digits != DigitsSix {
+	if token.Digits != ipa.DigitsSix {
 		t.Error("Invalid digits returned")
 	}
 

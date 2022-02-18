@@ -20,12 +20,15 @@ import (
 	"time"
 
 	"github.com/go-ini/ini"
-	"gopkg.in/jcmturner/gokrb5.v6/client"
-	"gopkg.in/jcmturner/gokrb5.v6/config"
-	"gopkg.in/jcmturner/gokrb5.v6/keytab"
+	"github.com/jcmturner/gokrb5/v8/client"
+	"github.com/jcmturner/gokrb5/v8/config"
+	"github.com/jcmturner/gokrb5/v8/credentials"
+	"github.com/jcmturner/gokrb5/v8/keytab"
+	"github.com/jcmturner/gokrb5/v8/spnego"
 )
 
 const (
+	DefaultKerbConf   = "/etc/krb5.conf"
 	IpaClientVersion  = "2.156"
 	IpaDatetimeFormat = "20060102150405Z"
 )
@@ -282,7 +285,7 @@ func (c *Client) rpc(method string, params []string, options map[string]interfac
 		req.Header.Set("Cookie", fmt.Sprintf("ipa_session=%s", c.sessionID))
 	} else if c.krbClient != nil {
 		// use Kerberos auth (SPNEGO)
-		c.krbClient.SetSPNEGOHeader(req, "")
+		spnego.SetSPNEGOHeader(c.krbClient, req, "")
 	}
 
 	res, err := c.httpClient.Do(req)
@@ -317,6 +320,16 @@ func (c *Client) rpc(method string, params []string, options map[string]interfac
 	}
 
 	return &ipaRes, nil
+}
+
+// Returns FreeIPA server hostname
+func (c *Client) Host() string {
+	return c.host
+}
+
+// Returns FreeIPA realm
+func (c *Client) Realm() string {
+	return c.realm
 }
 
 // Ping FreeIPA server to check connection
@@ -406,27 +419,26 @@ func (c *Client) RemoteLogin(uid, passwd string) error {
 
 // Login to FreeIPA using local kerberos login username and password
 func (c *Client) Login(username, password string) error {
-	cfg, err := config.Load("/etc/krb5.conf")
+	cfg, err := config.Load(DefaultKerbConf)
 	if err != nil {
 		return err
 	}
 
-	cl := client.NewClientWithPassword(username, c.realm, password)
-	cl.WithConfig(cfg)
+	cl := client.NewWithPassword(username, c.realm, password, cfg)
 
 	err = cl.Login()
 	if err != nil {
 		return err
 	}
 
-	c.krbClient = &cl
+	c.krbClient = cl
 
 	return nil
 }
 
 // Login to FreeIPA using local kerberos login with keytab and username
 func (c *Client) LoginWithKeytab(ktab, username string) error {
-	cfg, err := config.Load("/etc/krb5.conf")
+	cfg, err := config.Load(DefaultKerbConf)
 	if err != nil {
 		return err
 	}
@@ -436,15 +448,41 @@ func (c *Client) LoginWithKeytab(ktab, username string) error {
 		return err
 	}
 
-	cl := client.NewClientWithKeytab(username, c.realm, kt)
-	cl.WithConfig(cfg)
+	cl := client.NewWithKeytab(username, c.realm, kt, cfg)
 
 	err = cl.Login()
 	if err != nil {
 		return err
 	}
 
-	c.krbClient = &cl
+	c.krbClient = cl
+
+	return nil
+}
+
+// Login to FreeIPA using credentials cache
+func (c *Client) LoginFromCCache(cpath string) error {
+	cfg, err := config.Load(DefaultKerbConf)
+	if err != nil {
+		return err
+	}
+
+	ccache, err := credentials.LoadCCache(cpath)
+	if err != nil {
+		return err
+	}
+
+	cl, err := client.NewFromCCache(ccache, cfg, client.AssumePreAuthentication(true))
+	if err != nil {
+		return err
+	}
+
+	err = cl.Login()
+	if err != nil {
+		return err
+	}
+
+	c.krbClient = cl
 
 	return nil
 }

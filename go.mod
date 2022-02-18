@@ -4,11 +4,9 @@ go 1.14
 
 require (
 	github.com/go-ini/ini v1.37.0
-	github.com/hashicorp/go-uuid v0.0.0-20180228145832-27454136f036 // indirect
-	github.com/jcmturner/gofork v0.0.0-20180107083740-2aebee971930 // indirect
-	golang.org/x/crypto v0.0.0-20180820150726-614d502a4dac // indirect
-	gopkg.in/jcmturner/aescts.v1 v1.0.1 // indirect
-	gopkg.in/jcmturner/dnsutils.v1 v1.0.1 // indirect
-	gopkg.in/jcmturner/gokrb5.v6 v6.0.0
-	gopkg.in/jcmturner/rpc.v1 v1.1.0 // indirect
+	github.com/jcmturner/gokrb5/v8 v8.4.2
+	github.com/joho/godotenv v1.4.0 // indirect
+	github.com/smartystreets/goconvey v1.7.2 // indirect
+	github.com/stretchr/testify v1.7.0 // indirect
+	gopkg.in/ini.v1 v1.66.4 // indirect
 )
