@@ -5,6 +5,8 @@
 package ipa
 
 import (
+	"fmt"
+
 	"encoding/json"
 	"strings"
 )
@@ -112,7 +114,7 @@ func (d *Digits) UnmarshalJSON(b []byte) error {
 }
 
 func (d *Digits) String() string {
-	return string(*d)
+	return fmt.Sprint(*d)
 }
 
 // Remove OTP token
