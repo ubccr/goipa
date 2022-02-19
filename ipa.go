@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"regexp"
 	"strings"
@@ -84,7 +85,7 @@ type Result struct {
 // Response returned from a FreeIPA JSON rpc call
 type Response struct {
 	Error     *IpaError `json:"error"`
-	ID        string    `json:"id"`
+	ID        int       `json:"id"`
 	Principal string    `json:"principal"`
 	Version   string    `json:"version"`
 	Result    *Result   `json:"result"`
@@ -181,13 +182,15 @@ func (c *Client) rpc(method string, params []string, options Options) (*Response
 	if options == nil {
 		options = Options{}
 	}
-
 	options["version"] = IpaClientVersion
 
-	var data []interface{} = make([]interface{}, 2)
-	data[0] = params
-	data[1] = options
+	data := []interface{}{
+		params,
+		options,
+	}
+
 	payload := Options{
+		"id":     0,
 		"method": method,
 		"params": data,
 	}
@@ -214,6 +217,11 @@ func (c *Client) rpc(method string, params []string, options Options) (*Response
 		spnego.SetSPNEGOHeader(c.krbClient, req, "")
 	}
 
+	if log.IsLevelEnabled(log.TraceLevel) {
+		dump, _ := httputil.DumpRequestOut(req, true)
+		log.Tracef("FreeIPA RPC request: %s", dump)
+	}
+
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -228,8 +236,6 @@ func (c *Client) rpc(method string, params []string, options Options) (*Response
 		return nil, err
 	}
 
-	// XXX use the stream decoder here instead of reading entire body?
-	//decoder := json.NewDecoder(res.Body)
 	rawJson, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
@@ -327,6 +333,11 @@ func (c *Client) RemoteLogin(uid, passwd string) error {
 		return err
 	}
 	defer res.Body.Close()
+
+	if log.IsLevelEnabled(log.TraceLevel) {
+		dump, _ := httputil.DumpResponse(res, true)
+		log.Tracef("FreeIPA RemoteLogin response: %s", dump)
+	}
 
 	if res.StatusCode == 401 && res.Header.Get("X-IPA-Rejection-Reason") == "password-expired" {
 		return ErrExpiredPassword

@@ -8,10 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
 
@@ -290,6 +292,11 @@ func (c *Client) SetPassword(username, old_passwd, new_passwd, otpcode string) e
 		return err
 	}
 	defer res.Body.Close()
+
+	if log.IsLevelEnabled(log.TraceLevel) {
+		dump, _ := httputil.DumpResponse(res, true)
+		log.Tracef("FreeIPA SetPassword response: %s", dump)
+	}
 
 	if res.StatusCode != 200 {
 		return fmt.Errorf("ipa: change password failed with HTTP status code: %d", res.StatusCode)
