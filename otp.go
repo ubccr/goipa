@@ -34,11 +34,11 @@ type OTPToken struct {
 	DN        string    `json:"dn"`
 	Algorithm Algorithm `json:"ipatokenotpalgorithm"`
 	Digits    Digits    `json:"ipatokenotpdigits"`
-	Owner     IpaString `json:"ipatokenowner"`
-	TimeStep  IpaString `json:"ipatokentotptimestep"`
-	UUID      IpaString `json:"ipatokenuniqueid"`
-	ManagedBy IpaString `json:"managedby_user"`
-	Disabled  IpaString `json:"ipatokendisabled"`
+	Owner     string    `json:"ipatokenowner"`
+	TimeStep  string    `json:"ipatokentotptimestep"`
+	UUID      string    `json:"ipatokenuniqueid"`
+	ManagedBy string    `json:"managedby_user"`
+	Disabled  string    `json:"ipatokendisabled"`
 	Type      string    `json:"type"`
 	URI       string    `json:"uri"`
 }

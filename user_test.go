@@ -6,44 +6,44 @@ package ipa_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
+	"github.com/brianvoe/gofakeit/v6"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/ubccr/goipa"
 )
 
-func TestUserShow(t *testing.T) {
-	user := os.Getenv("GOIPA_TEST_USER")
-	c, err := newTestClientUserPassword()
-	require.NoError(t, err)
-
-	// Test using ipa_session
-	rec, err := c.UserShow(user)
-
+func addTestUser(c *ipa.Client, username, password string) (*ipa.User, error) {
+	first := gofakeit.FirstName()
+	last := gofakeit.LastName()
+	rec, err := c.UserAdd(username, "", first, last, "", "", password != "")
 	if err != nil {
-		t.Error(err)
-		t.FailNow()
+		return nil, err
 	}
 
-	if string(rec.Uid) != user {
-		t.Errorf("Invalid user")
-	}
-
-	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 {
-		c, err = newTestClientKeytab()
-		require.NoError(t, err)
-
-		// Test using keytab if set
-		rec, err := c.UserShow(user)
-
-		if err != nil || rec == nil {
-			t.Error(err)
-		}
-
-		if string(rec.Uid) != user {
-			t.Errorf("Invalid user")
+	if password != "" {
+		err = c.SetPassword(username, rec.RandomPassword, password, "")
+		if err != nil {
+			return nil, err
 		}
 	}
+
+	return rec, nil
+}
+
+func TestUserShow(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	c, err := newTestClientCCache()
+	require.NoError(err)
+
+	rec, err := c.UserShow(TestEnvAdminUser)
+	require.NoError(err)
+
+	assert.Equalf(TestEnvAdminUser, rec.Username, "User username invalid")
 }
 
 func TestUpdateSSHPubKeys(t *testing.T) {
@@ -146,90 +146,81 @@ func TestUserAuthTypes(t *testing.T) {
 }
 
 func TestUserAdd(t *testing.T) {
-	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 && len(os.Getenv("GOIPA_TEST_USER_CREATE_UID")) > 0 {
-		c, err := newTestClientKeytab()
-		require.NoError(t, err)
+	require := require.New(t)
+	assert := assert.New(t)
 
-		uid := os.Getenv("GOIPA_TEST_USER_CREATE_UID")
-		email := os.Getenv("GOIPA_TEST_USER_CREATE_UID") + "@localhost.localdomain"
-		first := "Mokey"
-		last := "Test"
-		homedir := ""
-		shell := ""
-		random := false
+	c, err := newTestClientCCache()
+	require.NoError(err)
 
-		if len(os.Getenv("GOIPA_TEST_USER_CREATE_PASSWD")) > 0 {
-			random = true
-		}
+	username := gofakeit.Username()
+	email := gofakeit.Email()
+	first := gofakeit.FirstName()
+	last := gofakeit.LastName()
+	home := "/user/" + username
+	shell := "/bin/bash"
+	password := gofakeit.Password(true, true, true, true, false, 16)
 
-		rec, err := c.UserAdd(uid, email, first, last, homedir, shell, random)
-		if err != nil {
-			t.Fatal(err)
-		}
+	rec, err := c.UserAdd(username, email, first, last, home, shell, true)
+	require.NoError(err)
 
-		if string(rec.Uid) != uid {
-			t.Errorf("User uid invalid")
-		}
+	assert.Equalf(strings.ToLower(username), rec.Username, "User username invalid")
+	assert.Equalf(email, rec.Email, "Email is invalid")
+	assert.Equalf(first, rec.First, "First name is invalid")
+	assert.Equalf(last, rec.Last, "Last name is invalid")
+	assert.Equalf(home, rec.HomeDir, "Homedir is invalid")
+	assert.Equalf(shell, rec.Shell, "Shell is invalid")
 
-		if random {
-			// Set password
-			password := os.Getenv("GOIPA_TEST_USER_CREATE_PASSWD")
-			err := c.SetPassword(uid, rec.Randompassword, password, "")
-			if err != nil {
-				t.Errorf("Failed to set user password")
-			}
-		}
-	}
+	err = c.SetPassword(username, rec.RandomPassword, password, "")
+	assert.NoErrorf(err, "Failed to set password")
+
+	userClient := ipa.NewDefaultClient()
+	err = userClient.RemoteLogin(username, password)
+	require.NoErrorf(err, "Failed to login as new user account")
+	assert.NotEmptyf(c.SessionID(), "Missing sessionID for new user account")
+
+	err = c.UserDelete(false, false, username)
+	assert.NoErrorf(err, "Failed to remove user")
 }
 
 func TestUserLock(t *testing.T) {
-	if len(os.Getenv("GOIPA_TEST_KEYTAB")) > 0 && len(os.Getenv("GOIPA_TEST_USER")) > 0 {
-		c, err := newTestClientKeytab()
-		require.NoError(t, err)
+	require := require.New(t)
+	assert := assert.New(t)
 
-		user := os.Getenv("GOIPA_TEST_USER")
-		pass := os.Getenv("GOIPA_TEST_PASSWD")
+	c, err := newTestClientCCache()
+	require.NoError(err)
 
-		rec, err := c.UserShow(user)
-		if err != nil {
-			t.Fatal(err)
-		}
+	username := gofakeit.Username()
+	password := gofakeit.Password(true, true, true, true, false, 16)
 
-		if rec.Locked() {
-			t.Errorf("Account not be disabled")
-		}
+	rec, err := addTestUser(c, username, password)
+	require.NoErrorf(err, "Failed to add test user")
 
-		err = c.UserDisable(user)
-		if err != nil {
-			t.Fatal(err)
-		}
+	assert.Falsef(rec.Locked, "Account should not be disabled")
 
-		rec, err = c.UserShow(user)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err = c.UserDisable(username)
+	assert.NoErrorf(err, "Failed to disable user")
 
-		if !rec.Locked() {
-			t.Errorf("Account should be disabled")
-		}
+	rec, err = c.UserShow(username)
+	require.NoErrorf(err, "Failed to show user")
 
-		err = c.RemoteLogin(user, pass)
-		if err == nil {
-			t.Errorf("User should not be able to login")
-		}
+	assert.Truef(rec.Locked, "Account should be locked")
 
-		err = c.UserEnable(user)
-		if err != nil {
-			t.Fatal(err)
-		}
+	userClient := ipa.NewDefaultClient()
+	err = userClient.RemoteLogin(username, password)
+	assert.Errorf(err, "User should not be able to login")
 
-		rec, err = c.UserShow(user)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err = c.UserEnable(username)
+	assert.NoErrorf(err, "Failed to enable user")
 
-		if rec.Locked() {
-			t.Errorf("Account should not be disabled")
-		}
-	}
+	rec, err = c.UserShow(username)
+	require.NoErrorf(err, "Failed to show user")
+
+	assert.Falsef(rec.Locked, "Account should not be disabled")
+
+	userClient = ipa.NewDefaultClient()
+	err = userClient.RemoteLogin(username, password)
+	assert.NoErrorf(err, "User should be able to login")
+
+	err = c.UserDelete(false, false, username)
+	assert.NoErrorf(err, "Failed to remove user")
 }

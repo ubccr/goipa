@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -25,11 +26,12 @@ import (
 	"github.com/jcmturner/gokrb5/v8/credentials"
 	"github.com/jcmturner/gokrb5/v8/keytab"
 	"github.com/jcmturner/gokrb5/v8/spnego"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
 	DefaultKerbConf   = "/etc/krb5.conf"
-	IpaClientVersion  = "2.156"
+	IpaClientVersion  = "2.237"
 	IpaDatetimeFormat = "20060102150405Z"
 )
 
@@ -38,6 +40,18 @@ var (
 	ipaDefaultRealm   string
 	ipaCertPool       *x509.CertPool
 	ipaSessionPattern = regexp.MustCompile(`^ipa_session=([^;]+);`)
+
+	// ErrPasswordPolicy is returned when a password does not conform to the password policy
+	ErrPasswordPolicy = errors.New("password does not conform to policy")
+
+	// ErrInvalidPassword is returned when a password is invalid
+	ErrInvalidPassword = errors.New("invalid current password")
+
+	// ErrExpiredPassword is returned when a password is expired
+	ErrExpiredPassword = errors.New("password expired")
+
+	// ErrUnauthorized is returned when user is not authorized
+	ErrUnauthorized = errors.New("unauthorized")
 )
 
 // FreeIPA Client
@@ -51,41 +65,14 @@ type Client struct {
 	krbClient  *client.Client
 }
 
-// FreeIPA Password Policy Error
-type ErrPasswordPolicy struct {
-}
-
-func (e *ErrPasswordPolicy) Error() string {
-	return "ipa: password does not conform to policy"
-}
-
-// FreeIPA Invalid Password Error
-type ErrInvalidPassword struct {
-}
-
-func (e *ErrInvalidPassword) Error() string {
-	return "ipa: invalid current password"
-}
-
-// FreeIPA Expired Password Error
-type ErrExpiredPassword struct {
-}
-
-func (e *ErrExpiredPassword) Error() string {
-	return "ipa: password expired"
-}
+// FreeIPA api options map
+type Options map[string]interface{}
 
 // FreeIPA error
 type IpaError struct {
 	Message string
 	Code    int
 }
-
-// Custom FreeIPA string type
-type IpaString string
-
-// Custom FreeIPA datetime type
-type IpaDateTime time.Time
 
 // Result returned from a FreeIPA JSON rpc call
 type Result struct {
@@ -97,7 +84,7 @@ type Result struct {
 // Response returned from a FreeIPA JSON rpc call
 type Response struct {
 	Error     *IpaError `json:"error"`
-	Id        string    `json:"id"`
+	ID        string    `json:"id"`
 	Principal string    `json:"principal"`
 	Version   string    `json:"version"`
 	Result    *Result   `json:"result"`
@@ -129,7 +116,17 @@ func newHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: 1 * time.Minute,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{RootCAs: ipaCertPool},
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			TLSClientConfig:       &tls.Config{RootCAs: ipaCertPool},
+			DisableCompression:    false,
 		},
 	}
 }
@@ -175,86 +172,14 @@ func NewClientCustomHttp(host, realm string, httpClient *http.Client) *Client {
 	}
 }
 
-// Unmarshal a FreeIPA datetime. Datetimes in FreeIPA are returned using a
-// class-hint system. Values are stored as an array with a single element
-// indicating the type and value, for example, '[{"__datetime__": "YYYY-MM-DDTHH:MM:SSZ"]}'
-func (dt *IpaDateTime) UnmarshalJSON(b []byte) error {
-	var a []map[string]string
-	err := json.Unmarshal(b, &a)
-	if err != nil {
-		return err
-	}
-
-	if len(a) == 0 {
-		return nil
-	}
-
-	if str, ok := a[0]["__datetime__"]; ok {
-		t, err := time.Parse(IpaDatetimeFormat, str)
-		if err != nil {
-			return err
-		}
-		*dt = IpaDateTime(t)
-	}
-
-	return nil
-}
-
-func (dt *IpaDateTime) UnmarshalBinary(data []byte) error {
-	t := time.Time(*dt)
-	err := t.UnmarshalBinary(data)
-	if err != nil {
-		return err
-	}
-
-	*dt = IpaDateTime(t)
-	return nil
-}
-
-func (dt *IpaDateTime) MarshalBinary() (data []byte, err error) {
-	return time.Time(*dt).MarshalBinary()
-}
-
-func (dt *IpaDateTime) String() string {
-	return time.Time(*dt).String()
-}
-
-func (dt *IpaDateTime) IsZero() bool {
-	return time.Time(*dt).IsZero()
-}
-
-func (dt *IpaDateTime) Format(layout string) string {
-	return time.Time(*dt).Format(layout)
-}
-
-// Unmarshal a FreeIPA string from an array of strings. Uses the first value
-// in the array as the value of the string.
-func (s *IpaString) UnmarshalJSON(b []byte) error {
-	var a []string
-	err := json.Unmarshal(b, &a)
-	if err != nil {
-		return err
-	}
-
-	if len(a) > 0 {
-		*s = IpaString(a[0])
-	}
-
-	return nil
-}
-
-func (s *IpaString) String() string {
-	return string(*s)
-}
-
 func (e *IpaError) Error() string {
 	return fmt.Sprintf("ipa: error %d - %s", e.Code, e.Message)
 }
 
 // Call FreeIPA API with method, params and options
-func (c *Client) rpc(method string, params []string, options map[string]interface{}) (*Response, error) {
+func (c *Client) rpc(method string, params []string, options Options) (*Response, error) {
 	if options == nil {
-		options = map[string]interface{}{}
+		options = Options{}
 	}
 
 	options["version"] = IpaClientVersion
@@ -262,9 +187,10 @@ func (c *Client) rpc(method string, params []string, options map[string]interfac
 	var data []interface{} = make([]interface{}, 2)
 	data[0] = params
 	data[1] = options
-	payload := map[string]interface{}{
+	payload := Options{
 		"method": method,
-		"params": data}
+		"params": data,
+	}
 
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -278,7 +204,7 @@ func (c *Client) rpc(method string, params []string, options map[string]interfac
 
 	req, err := http.NewRequest("POST", ipaUrl, bytes.NewBuffer(b))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.host))
+	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa/xml", c.host))
 
 	if len(c.sessionID) > 0 {
 		// If session is set, use the session id
@@ -309,6 +235,8 @@ func (c *Client) rpc(method string, params []string, options map[string]interfac
 		return nil, err
 	}
 
+	log.Tracef("FreeIPA JSON response: %s", string(rawJson))
+
 	var ipaRes Response
 	err = json.Unmarshal(rawJson, &ipaRes)
 	if err != nil {
@@ -334,9 +262,7 @@ func (c *Client) Realm() string {
 
 // Ping FreeIPA server to check connection
 func (c *Client) Ping() (*Response, error) {
-	options := map[string]interface{}{}
-
-	res, err := c.rpc("ping", []string{}, options)
+	res, err := c.rpc("ping", []string{}, nil)
 
 	if err != nil {
 		return nil, err
@@ -403,7 +329,15 @@ func (c *Client) RemoteLogin(uid, passwd string) error {
 	defer res.Body.Close()
 
 	if res.StatusCode == 401 && res.Header.Get("X-IPA-Rejection-Reason") == "password-expired" {
-		return &ErrExpiredPassword{}
+		return ErrExpiredPassword
+	}
+
+	if res.StatusCode == 401 && res.Header.Get("X-IPA-Rejection-Reason") == "invalid-password" {
+		return ErrInvalidPassword
+	}
+
+	if res.StatusCode == 401 {
+		return ErrUnauthorized
 	}
 
 	if res.StatusCode != 200 {
@@ -485,4 +419,16 @@ func (c *Client) LoginFromCCache(cpath string) error {
 	c.krbClient = cl
 
 	return nil
+}
+
+// Parse a FreeIPA datetime. Datetimes in FreeIPA are returned using a
+// class-hint system. Values are stored as an array with a single element
+// indicating the type and value, for example, '[{"__datetime__": "YYYY-MM-DDTHH:MM:SSZ"]}'
+func ParseDateTime(str string) time.Time {
+	dt, err := time.Parse(IpaDatetimeFormat, str)
+	if err != nil {
+		return time.Time{}
+	}
+
+	return dt
 }

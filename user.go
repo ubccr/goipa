@@ -5,48 +5,113 @@
 package ipa
 
 import (
-	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
+
+	"github.com/tidwall/gjson"
 )
 
-// UserRecord encapsulates user data returned from ipa user commands
-type UserRecord struct {
-	Dn               string      `json:"dn"`
-	First            IpaString   `json:"givenname"`
-	Last             IpaString   `json:"sn"`
-	DisplayName      IpaString   `json:"displayname"`
-	Principal        IpaString   `json:"krbprincipalname"`
-	Uid              IpaString   `json:"uid"`
-	UidNumber        IpaString   `json:"uidnumber"`
-	GidNumber        IpaString   `json:"gidnumber"`
-	Groups           []string    `json:"memberof_group"`
-	SSHPubKeys       []string    `json:"ipasshpubkey"`
-	SSHPubKeyFps     []string    `json:"sshpubkeyfp"`
-	AuthTypes        []string    `json:"ipauserauthtype"`
-	HasKeytab        bool        `json:"has_keytab"`
-	HasPassword      bool        `json:"has_password"`
-	NSAccountLock    bool        `json:"nsaccountlock"`
-	HomeDir          IpaString   `json:"homedirectory"`
-	Email            IpaString   `json:"mail"`
-	Mobile           IpaString   `json:"mobile"`
-	Shell            IpaString   `json:"loginshell"`
-	SudoRules        IpaString   `json:"memberofindirect_sudorule"`
-	HbacRules        IpaString   `json:"memberofindirect_hbacrule"`
-	LastPasswdChange IpaDateTime `json:"krblastpwdchange"`
-	PasswdExpire     IpaDateTime `json:"krbpasswordexpiration"`
-	PrincipalExpire  IpaDateTime `json:"krbprincipalexpiration"`
-	LastLoginSuccess IpaDateTime `json:"krblastsuccessfulauth"`
-	LastLoginFail    IpaDateTime `json:"krblastfailedauth"`
-	Randompassword   string      `json:"randompassword"`
+// User encapsulates user data returned from ipa user commands
+type User struct {
+	UUID             string    `json:"ipauniqueid"`
+	DN               string    `json:"dn"`
+	First            string    `json:"givenname"`
+	Last             string    `json:"sn"`
+	DisplayName      string    `json:"displayname"`
+	Principal        string    `json:"krbprincipalname"`
+	Username         string    `json:"uid"`
+	Uid              string    `json:"uidnumber"`
+	Gid              string    `json:"gidnumber"`
+	Groups           []string  `json:"memberof_group"`
+	SSHPubKeys       []string  `json:"ipasshpubkey"`
+	SSHPubKeyFps     []string  `json:"sshpubkeyfp"`
+	AuthTypes        []string  `json:"ipauserauthtype"`
+	HasKeytab        bool      `json:"has_keytab"`
+	HasPassword      bool      `json:"has_password"`
+	Locked           bool      `json:"nsaccountlock"`
+	Preserved        bool      `json:"preserved"`
+	HomeDir          string    `json:"homedirectory"`
+	Email            string    `json:"mail"`
+	TelephoneNumber  string    `json:"telephonenumber"`
+	Mobile           string    `json:"mobile"`
+	Shell            string    `json:"loginshell"`
+	SudoRules        []string  `json:"memberofindirect_sudorule"`
+	HbacRules        []string  `json:"memberofindirect_hbacrule"`
+	LastPasswdChange time.Time `json:"krblastpwdchange"`
+	PasswdExpire     time.Time `json:"krbpasswordexpiration"`
+	PrincipalExpire  time.Time `json:"krbprincipalexpiration"`
+	LastLoginSuccess time.Time `json:"krblastsuccessfulauth"`
+	LastLoginFail    time.Time `json:"krblastfailedauth"`
+	RandomPassword   string    `json:"randompassword"`
+}
+
+func (u *User) fromJSON(raw []byte) error {
+	if !gjson.ValidBytes(raw) {
+		return errors.New("invalid user record json")
+	}
+
+	u.UUID = gjson.GetBytes(raw, "ipauniqueid.0").String()
+	u.DN = gjson.GetBytes(raw, "dn").String()
+	u.First = gjson.GetBytes(raw, "givenname.0").String()
+	u.Last = gjson.GetBytes(raw, "sn.0").String()
+	u.DisplayName = gjson.GetBytes(raw, "displayname.0").String()
+	u.Principal = gjson.GetBytes(raw, "krbprincipalname.0").String()
+	u.Username = gjson.GetBytes(raw, "uid.0").String()
+	u.Uid = gjson.GetBytes(raw, "uidnumber.0").String()
+	u.Gid = gjson.GetBytes(raw, "gidnumber.0").String()
+	u.HasKeytab = gjson.GetBytes(raw, "has_keytab").Bool()
+	u.HasPassword = gjson.GetBytes(raw, "has_password").Bool()
+	u.Locked = gjson.GetBytes(raw, "nsaccountlock").Bool()
+	u.Preserved = gjson.GetBytes(raw, "preserved").Bool()
+	u.HomeDir = gjson.GetBytes(raw, "homedirectory.0").String()
+	u.Email = gjson.GetBytes(raw, "mail.0").String()
+	u.Mobile = gjson.GetBytes(raw, "mobile.0").String()
+	u.TelephoneNumber = gjson.GetBytes(raw, "telephonenumber.0").String()
+	u.Shell = gjson.GetBytes(raw, "loginshell.0").String()
+	u.RandomPassword = gjson.GetBytes(raw, "randompassword").String()
+	u.LastPasswdChange = ParseDateTime(gjson.GetBytes(raw, "krblastpwdchange.0.__datetime__").String())
+	u.PasswdExpire = ParseDateTime(gjson.GetBytes(raw, "krbpasswordexpiration.0.__datetime__").String())
+	u.PrincipalExpire = ParseDateTime(gjson.GetBytes(raw, "krbprincipalexpiration.0.__datetime__").String())
+	u.LastLoginSuccess = ParseDateTime(gjson.GetBytes(raw, "krblastsuccessfulauth.0.__datetime__").String())
+	u.LastLoginFail = ParseDateTime(gjson.GetBytes(raw, "krblastfailedauth.0.__datetime__").String())
+	gjson.GetBytes(raw, "memberof_group").ForEach(func(key, value gjson.Result) bool {
+		u.Groups = append(u.Groups, value.String())
+		return true
+	})
+	gjson.GetBytes(raw, "ipasshpubkey").ForEach(func(key, value gjson.Result) bool {
+		u.SSHPubKeys = append(u.SSHPubKeys, value.String())
+		return true
+	})
+	gjson.GetBytes(raw, "sshpubkeyfp").ForEach(func(key, value gjson.Result) bool {
+		u.SSHPubKeyFps = append(u.SSHPubKeyFps, value.String())
+		return true
+	})
+	gjson.GetBytes(raw, "ipauserauthtype").ForEach(func(key, value gjson.Result) bool {
+		u.AuthTypes = append(u.AuthTypes, value.String())
+		return true
+	})
+	gjson.GetBytes(raw, "memberof_hbacrule").ForEach(func(key, value gjson.Result) bool {
+		u.HbacRules = append(u.HbacRules, value.String())
+		return true
+	})
+	gjson.GetBytes(raw, "memberofindirect_hbacrule").ForEach(func(key, value gjson.Result) bool {
+		u.HbacRules = append(u.HbacRules, value.String())
+		return true
+	})
+	gjson.GetBytes(raw, "memberofindirect_sudorule").ForEach(func(key, value gjson.Result) bool {
+		u.SudoRules = append(u.SudoRules, value.String())
+		return true
+	})
+
+	return nil
 }
 
 // Returns true if OTP is the only authentication type enabled
-func (u *UserRecord) OTPOnly() bool {
+func (u *User) OTPOnly() bool {
 	if len(u.AuthTypes) == 1 && u.AuthTypes[0] == "otp" {
 		return true
 	}
@@ -55,7 +120,7 @@ func (u *UserRecord) OTPOnly() bool {
 }
 
 // Returns true if the User is in group
-func (u *UserRecord) HasGroup(group string) bool {
+func (u *User) HasGroup(group string) bool {
 	for _, g := range u.Groups {
 		if g == group {
 			return true
@@ -65,48 +130,45 @@ func (u *UserRecord) HasGroup(group string) bool {
 	return false
 }
 
-// Returns true if the User is locked
-func (u *UserRecord) Locked() bool {
-	return u.NSAccountLock
-}
-
 // Fetch user details by call the FreeIPA user-show method
-func (c *Client) UserShow(uid string) (*UserRecord, error) {
+func (c *Client) UserShow(username string) (*User, error) {
 
-	options := map[string]interface{}{
+	options := Options{
 		"no_members": false,
-		"all":        true}
+		"all":        true,
+	}
 
-	res, err := c.rpc("user_show", []string{uid}, options)
+	res, err := c.rpc("user_show", []string{username}, options)
 
 	if err != nil {
 		return nil, err
 	}
 
-	var userRec UserRecord
-	err = json.Unmarshal(res.Result.Data, &userRec)
+	userRec := new(User)
+	err = userRec.fromJSON(res.Result.Data)
 	if err != nil {
 		return nil, err
 	}
 
-	return &userRec, nil
+	return userRec, nil
 }
 
-// Update ssh public keys for user uid. Returns the fingerprints on success.
-func (c *Client) UpdateSSHPubKeys(uid string, keys []string) ([]string, error) {
-	options := map[string]interface{}{
+// Update ssh public keys for username. Returns the fingerprints on success.
+func (c *Client) UpdateSSHPubKeys(username string, keys []string) ([]string, error) {
+	options := Options{
 		"no_members":   false,
 		"ipasshpubkey": keys,
-		"all":          false}
+		"all":          false,
+	}
 
-	res, err := c.rpc("user_mod", []string{uid}, options)
+	res, err := c.rpc("user_mod", []string{username}, options)
 
 	if err != nil {
 		return nil, err
 	}
 
-	var userRec UserRecord
-	err = json.Unmarshal(res.Result.Data, &userRec)
+	userRec := new(User)
+	err = userRec.fromJSON(res.Result.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -116,13 +178,32 @@ func (c *Client) UpdateSSHPubKeys(uid string, keys []string) ([]string, error) {
 
 // Update mobile number. Currently will store only a single number. Any
 // existing numbers will be overwritten.
-func (c *Client) UpdateMobileNumber(uid string, number string) error {
-	options := map[string]interface{}{
+func (c *Client) UpdateMobileNumber(username string, number string) error {
+	options := Options{
 		"no_members": false,
 		"mobile":     []string{number},
-		"all":        false}
+		"all":        false,
+	}
 
-	_, err := c.rpc("user_mod", []string{uid}, options)
+	_, err := c.rpc("user_mod", []string{username}, options)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Update telephone number. Currently will store only a single number. Any
+// existing numbers will be overwritten.
+func (c *Client) UpdateTelephoneNumber(username string, number string) error {
+	options := Options{
+		"no_members":      false,
+		"telephonenumber": []string{number},
+		"all":             false,
+	}
+
+	_, err := c.rpc("user_mod", []string{username}, options)
 
 	if err != nil {
 		return err
@@ -132,37 +213,37 @@ func (c *Client) UpdateMobileNumber(uid string, number string) error {
 }
 
 // Reset user password and return new random password
-func (c *Client) ResetPassword(uid string) (string, error) {
+func (c *Client) ResetPassword(username string) (string, error) {
 
-	options := map[string]interface{}{
+	options := Options{
 		"no_members": false,
 		"random":     true,
 		"all":        true}
 
-	res, err := c.rpc("user_mod", []string{uid}, options)
+	res, err := c.rpc("user_mod", []string{username}, options)
 
 	if err != nil {
 		return "", err
 	}
 
-	var userRec UserRecord
-	err = json.Unmarshal(res.Result.Data, &userRec)
+	userRec := new(User)
+	err = userRec.fromJSON(res.Result.Data)
 	if err != nil {
 		return "", err
 	}
 
-	if len(userRec.Randompassword) == 0 {
+	if len(userRec.RandomPassword) == 0 {
 		return "", errors.New("ipa: failed to reset user password. empty random password returned")
 	}
 
-	return userRec.Randompassword, nil
+	return userRec.RandomPassword, nil
 }
 
 // Change user password. This will run the passwd ipa command. Optionally
 // provide an OTP if required
-func (c *Client) ChangePassword(uid, old_passwd, new_passwd, otpcode string) error {
+func (c *Client) ChangePassword(username, old_passwd, new_passwd, otpcode string) error {
 
-	options := map[string]interface{}{
+	options := Options{
 		"current_password": old_passwd,
 		"password":         new_passwd,
 	}
@@ -171,7 +252,7 @@ func (c *Client) ChangePassword(uid, old_passwd, new_passwd, otpcode string) err
 		options["otp"] = otpcode
 	}
 
-	_, err := c.rpc("passwd", []string{uid}, options)
+	_, err := c.rpc("passwd", []string{username}, options)
 
 	if err != nil {
 		return err
@@ -190,23 +271,21 @@ func (c *Client) ChangePassword(uid, old_passwd, new_passwd, otpcode string) err
 // then immediately calling this function. *WARNING* See
 // https://www.freeipa.org/page/Self-Service_Password_Reset for security issues
 // and possible weaknesses of this approach.
-func (c *Client) SetPassword(uid, old_passwd, new_passwd, otpcode string) error {
+func (c *Client) SetPassword(username, old_passwd, new_passwd, otpcode string) error {
 	ipaUrl := fmt.Sprintf("https://%s/ipa/session/change_password", c.host)
 
 	form := url.Values{
-		"user":         {uid},
+		"user":         {username},
 		"otp":          {otpcode},
 		"old_password": {old_passwd},
-		"new_password": {new_passwd}}
+		"new_password": {new_passwd},
+	}
+
 	req, err := http.NewRequest("POST", ipaUrl, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.host))
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{RootCAs: ipaCertPool}}
-	client := &http.Client{Transport: tr}
-
-	res, err := client.Do(req)
+	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -218,9 +297,9 @@ func (c *Client) SetPassword(uid, old_passwd, new_passwd, otpcode string) error 
 
 	status := res.Header.Get("x-ipa-pwchange-result")
 	if status == "policy-error" {
-		return &ErrPasswordPolicy{}
+		return ErrPasswordPolicy
 	} else if status == "invalid-password" {
-		return &ErrInvalidPassword{}
+		return ErrInvalidPassword
 	} else if strings.ToLower(status) != "ok" {
 		return errors.New("ipa: change password failed. Unknown status")
 	}
@@ -229,17 +308,18 @@ func (c *Client) SetPassword(uid, old_passwd, new_passwd, otpcode string) error 
 }
 
 // Update user authentication types.
-func (c *Client) SetAuthTypes(uid string, types []string) error {
-	options := map[string]interface{}{
+func (c *Client) SetAuthTypes(username string, types []string) error {
+	options := Options{
 		"no_members":      false,
 		"ipauserauthtype": types,
-		"all":             false}
+		"all":             false,
+	}
 
 	if len(types) == 0 {
 		options["ipauserauthtype"] = ""
 	}
 
-	_, err := c.rpc("user_mod", []string{uid}, options)
+	_, err := c.rpc("user_mod", []string{username}, options)
 
 	if err != nil {
 		return err
@@ -249,8 +329,8 @@ func (c *Client) SetAuthTypes(uid string, types []string) error {
 }
 
 // Disable User Account
-func (c *Client) UserDisable(uid string) error {
-	_, err := c.rpc("user_disable", []string{uid}, nil)
+func (c *Client) UserDisable(username string) error {
+	_, err := c.rpc("user_disable", []string{username}, nil)
 
 	if err != nil {
 		return err
@@ -260,8 +340,8 @@ func (c *Client) UserDisable(uid string) error {
 }
 
 // Enable User Account
-func (c *Client) UserEnable(uid string) error {
-	_, err := c.rpc("user_enable", []string{uid}, nil)
+func (c *Client) UserEnable(username string) error {
+	_, err := c.rpc("user_enable", []string{username}, nil)
 
 	if err != nil {
 		return err
@@ -272,11 +352,12 @@ func (c *Client) UserEnable(uid string) error {
 
 // Add new user. If random is true a random password will be created for the
 // user. Note this requires "User Administrators" Privilege in FreeIPA.
-func (c *Client) UserAdd(uid, email, first, last, homedir, shell string, random bool) (*UserRecord, error) {
-	var options = map[string]interface{}{
+func (c *Client) UserAdd(username, email, first, last, homedir, shell string, random bool) (*User, error) {
+	var options = Options{
 		"mail":      email,
 		"givenname": first,
-		"sn":        last}
+		"sn":        last,
+	}
 
 	if len(homedir) > 0 {
 		options["homedirectory"] = homedir
@@ -290,16 +371,33 @@ func (c *Client) UserAdd(uid, email, first, last, homedir, shell string, random 
 		options["random"] = true
 	}
 
-	res, err := c.rpc("user_add", []string{uid}, options)
+	res, err := c.rpc("user_add", []string{username}, options)
 	if err != nil {
 		return nil, err
 	}
 
-	var userRec UserRecord
-	err = json.Unmarshal(res.Result.Data, &userRec)
+	userRec := new(User)
+	err = userRec.fromJSON(res.Result.Data)
 	if err != nil {
 		return nil, err
 	}
 
-	return &userRec, nil
+	return userRec, nil
+}
+
+// Delete user. If preserve is false the user will be permanetly deleted, if
+// true the users is moved to the Delete container. If stopOnError is false the
+// operation will be in continuous mode otherwise it will stop on errors
+func (c *Client) UserDelete(preserve, stopOnError bool, usernames ...string) error {
+	var options = Options{
+		"continue": !stopOnError,
+		"preserve": preserve,
+	}
+
+	_, err := c.rpc("user_del", usernames, options)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
