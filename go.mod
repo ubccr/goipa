@@ -11,5 +11,6 @@ require (
 	github.com/smartystreets/goconvey v1.7.2 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/gjson v1.14.0
+	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 	gopkg.in/ini.v1 v1.66.4 // indirect
 )

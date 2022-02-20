@@ -5,6 +5,8 @@
 package ipa
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,40 +17,79 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+	"golang.org/x/crypto/ssh"
 )
 
 // User encapsulates user data returned from ipa user commands
 type User struct {
-	UUID             string    `json:"ipauniqueid"`
-	DN               string    `json:"dn"`
-	First            string    `json:"givenname"`
-	Last             string    `json:"sn"`
-	DisplayName      string    `json:"displayname"`
-	Principal        string    `json:"krbprincipalname"`
-	Username         string    `json:"uid"`
-	Uid              string    `json:"uidnumber"`
-	Gid              string    `json:"gidnumber"`
-	Groups           []string  `json:"memberof_group"`
-	SSHPubKeys       []string  `json:"ipasshpubkey"`
-	SSHPubKeyFps     []string  `json:"sshpubkeyfp"`
-	AuthTypes        []string  `json:"ipauserauthtype"`
-	HasKeytab        bool      `json:"has_keytab"`
-	HasPassword      bool      `json:"has_password"`
-	Locked           bool      `json:"nsaccountlock"`
-	Preserved        bool      `json:"preserved"`
-	HomeDir          string    `json:"homedirectory"`
-	Email            string    `json:"mail"`
-	TelephoneNumber  string    `json:"telephonenumber"`
-	Mobile           string    `json:"mobile"`
-	Shell            string    `json:"loginshell"`
-	SudoRules        []string  `json:"memberofindirect_sudorule"`
-	HbacRules        []string  `json:"memberofindirect_hbacrule"`
-	LastPasswdChange time.Time `json:"krblastpwdchange"`
-	PasswdExpire     time.Time `json:"krbpasswordexpiration"`
-	PrincipalExpire  time.Time `json:"krbprincipalexpiration"`
-	LastLoginSuccess time.Time `json:"krblastsuccessfulauth"`
-	LastLoginFail    time.Time `json:"krblastfailedauth"`
-	RandomPassword   string    `json:"randompassword"`
+	UUID             string              `json:"ipauniqueid"`
+	DN               string              `json:"dn"`
+	First            string              `json:"givenname"`
+	Last             string              `json:"sn"`
+	DisplayName      string              `json:"displayname"`
+	Principal        string              `json:"krbprincipalname"`
+	Username         string              `json:"uid"`
+	Uid              string              `json:"uidnumber"`
+	Gid              string              `json:"gidnumber"`
+	Groups           []string            `json:"memberof_group"`
+	SSHAuthKeys      []*SSHAuthorizedKey `json:"ipasshpubkey"`
+	AuthTypes        []string            `json:"ipauserauthtype"`
+	HasKeytab        bool                `json:"has_keytab"`
+	HasPassword      bool                `json:"has_password"`
+	Locked           bool                `json:"nsaccountlock"`
+	Preserved        bool                `json:"preserved"`
+	HomeDir          string              `json:"homedirectory"`
+	Email            string              `json:"mail"`
+	TelephoneNumber  string              `json:"telephonenumber"`
+	Mobile           string              `json:"mobile"`
+	Shell            string              `json:"loginshell"`
+	SudoRules        []string            `json:"memberofindirect_sudorule"`
+	HbacRules        []string            `json:"memberofindirect_hbacrule"`
+	LastPasswdChange time.Time           `json:"krblastpwdchange"`
+	PasswdExpire     time.Time           `json:"krbpasswordexpiration"`
+	PrincipalExpire  time.Time           `json:"krbprincipalexpiration"`
+	LastLoginSuccess time.Time           `json:"krblastsuccessfulauth"`
+	LastLoginFail    time.Time           `json:"krblastfailedauth"`
+	RandomPassword   string              `json:"randompassword"`
+}
+
+// SSH Public Key
+type SSHAuthorizedKey struct {
+	Comment     string
+	Options     []string
+	PublicKey   ssh.PublicKey
+	Fingerprint string
+}
+
+func NewSSHAuthorizedKey(in string) (*SSHAuthorizedKey, error) {
+	k := new(SSHAuthorizedKey)
+	var err error
+	k.PublicKey, k.Comment, k.Options, _, err = ssh.ParseAuthorizedKey([]byte(in))
+	if err != nil {
+		return nil, err
+	}
+
+	k.Fingerprint = ssh.FingerprintSHA256(k.PublicKey)
+
+	return k, nil
+}
+
+func (k *SSHAuthorizedKey) String() string {
+	out := []string{}
+	if len(k.Options) > 0 {
+		out = append(out, strings.Join(k.Options, ","))
+	}
+
+	out = append(out, string(bytes.TrimSuffix(ssh.MarshalAuthorizedKey(k.PublicKey), []byte{'\n'})))
+	if k.Comment != "" {
+		out = append(out, k.Comment)
+	}
+
+	return strings.Join(out, " ")
+}
+
+func (k *SSHAuthorizedKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(k.String())
 }
 
 func (u *User) fromJSON(raw []byte) error {
@@ -85,11 +126,10 @@ func (u *User) fromJSON(raw []byte) error {
 		return true
 	})
 	gjson.GetBytes(raw, "ipasshpubkey").ForEach(func(key, value gjson.Result) bool {
-		u.SSHPubKeys = append(u.SSHPubKeys, value.String())
-		return true
-	})
-	gjson.GetBytes(raw, "sshpubkeyfp").ForEach(func(key, value gjson.Result) bool {
-		u.SSHPubKeyFps = append(u.SSHPubKeyFps, value.String())
+		k, err := NewSSHAuthorizedKey(value.String())
+		if err == nil {
+			u.SSHAuthKeys = append(u.SSHAuthKeys, k)
+		}
 		return true
 	})
 	gjson.GetBytes(raw, "ipauserauthtype").ForEach(func(key, value gjson.Result) bool {
@@ -132,6 +172,43 @@ func (u *User) HasGroup(group string) bool {
 	return false
 }
 
+// Removes ssh authorized key
+func (u *User) RemoveSSHAuthorizedKey(fingerprint string) {
+	index := -1
+	for i, k := range u.SSHAuthKeys {
+		if k.Fingerprint == fingerprint {
+			index = i
+			break
+		}
+	}
+
+	if index != -1 {
+		u.SSHAuthKeys = append(u.SSHAuthKeys[:index], u.SSHAuthKeys[index+1:]...)
+	}
+}
+
+// Add ssh authorized key
+func (u *User) AddSSHAuthorizedKey(key *SSHAuthorizedKey) {
+	for _, k := range u.SSHAuthKeys {
+		if key.Fingerprint == k.Fingerprint {
+			// Key already added
+			return
+		}
+	}
+
+	u.SSHAuthKeys = append(u.SSHAuthKeys, key)
+}
+
+// Format ssh authorized keys
+func (u *User) FormatSSHAuthorizedKeys() []string {
+	keys := []string{}
+	for _, k := range u.SSHAuthKeys {
+		keys = append(keys, k.String())
+	}
+
+	return keys
+}
+
 // Fetch user details by call the FreeIPA user-show method
 func (c *Client) UserShow(username string) (*User, error) {
 
@@ -153,65 +230,6 @@ func (c *Client) UserShow(username string) (*User, error) {
 	}
 
 	return userRec, nil
-}
-
-// Update ssh public keys for username. Returns the fingerprints on success.
-func (c *Client) UpdateSSHPubKeys(username string, keys []string) ([]string, error) {
-	options := Options{
-		"no_members":   false,
-		"ipasshpubkey": keys,
-		"all":          false,
-	}
-
-	res, err := c.rpc("user_mod", []string{username}, options)
-
-	if err != nil {
-		return nil, err
-	}
-
-	userRec := new(User)
-	err = userRec.fromJSON(res.Result.Data)
-	if err != nil {
-		return nil, err
-	}
-
-	return userRec.SSHPubKeyFps, nil
-}
-
-// Update mobile number. Currently will store only a single number. Any
-// existing numbers will be overwritten.
-func (c *Client) UpdateMobileNumber(username string, number string) error {
-	options := Options{
-		"no_members": false,
-		"mobile":     []string{number},
-		"all":        false,
-	}
-
-	_, err := c.rpc("user_mod", []string{username}, options)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Update telephone number. Currently will store only a single number. Any
-// existing numbers will be overwritten.
-func (c *Client) UpdateTelephoneNumber(username string, number string) error {
-	options := Options{
-		"no_members":      false,
-		"telephonenumber": []string{number},
-		"all":             false,
-	}
-
-	_, err := c.rpc("user_mod", []string{username}, options)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // Reset user password and return new random password
@@ -407,4 +425,34 @@ func (c *Client) UserDelete(preserve, stopOnError bool, usernames ...string) err
 	}
 
 	return nil
+}
+
+// Modify user. Currently only modifies a subset of user attributes: mail,
+// givenname, sn, homedirectory, loginshell, displayname, ipasshpubkey,
+// telephonenumber, and mobile
+func (c *Client) UserMod(user *User) (*User, error) {
+	var options = Options{
+		"mail":            user.Email,
+		"givenname":       user.First,
+		"sn":              user.Last,
+		"homedirectory":   user.HomeDir,
+		"loginshell":      user.Shell,
+		"displayname":     user.DisplayName,
+		"ipasshpubkey":    user.FormatSSHAuthorizedKeys(),
+		"telephonenumber": user.TelephoneNumber,
+		"mobile":          user.Mobile,
+	}
+
+	res, err := c.rpc("user_mod", []string{user.Username}, options)
+	if err != nil {
+		return nil, err
+	}
+
+	userRec := new(User)
+	err = userRec.fromJSON(res.Result.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	return userRec, nil
 }
