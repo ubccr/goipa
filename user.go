@@ -97,54 +97,56 @@ func (u *User) fromJSON(raw []byte) error {
 		return errors.New("invalid user record json")
 	}
 
-	u.UUID = gjson.GetBytes(raw, "ipauniqueid.0").String()
-	u.DN = gjson.GetBytes(raw, "dn").String()
-	u.First = gjson.GetBytes(raw, "givenname.0").String()
-	u.Last = gjson.GetBytes(raw, "sn.0").String()
-	u.DisplayName = gjson.GetBytes(raw, "displayname.0").String()
-	u.Principal = gjson.GetBytes(raw, "krbprincipalname.0").String()
-	u.Username = gjson.GetBytes(raw, "uid.0").String()
-	u.Uid = gjson.GetBytes(raw, "uidnumber.0").String()
-	u.Gid = gjson.GetBytes(raw, "gidnumber.0").String()
-	u.HasKeytab = gjson.GetBytes(raw, "has_keytab").Bool()
-	u.HasPassword = gjson.GetBytes(raw, "has_password").Bool()
-	u.Locked = gjson.GetBytes(raw, "nsaccountlock").Bool()
-	u.Preserved = gjson.GetBytes(raw, "preserved").Bool()
-	u.HomeDir = gjson.GetBytes(raw, "homedirectory.0").String()
-	u.Email = gjson.GetBytes(raw, "mail.0").String()
-	u.Mobile = gjson.GetBytes(raw, "mobile.0").String()
-	u.TelephoneNumber = gjson.GetBytes(raw, "telephonenumber.0").String()
-	u.Shell = gjson.GetBytes(raw, "loginshell.0").String()
-	u.RandomPassword = gjson.GetBytes(raw, "randompassword").String()
-	u.LastPasswdChange = ParseDateTime(gjson.GetBytes(raw, "krblastpwdchange.0.__datetime__").String())
-	u.PasswdExpire = ParseDateTime(gjson.GetBytes(raw, "krbpasswordexpiration.0.__datetime__").String())
-	u.PrincipalExpire = ParseDateTime(gjson.GetBytes(raw, "krbprincipalexpiration.0.__datetime__").String())
-	u.LastLoginSuccess = ParseDateTime(gjson.GetBytes(raw, "krblastsuccessfulauth.0.__datetime__").String())
-	u.LastLoginFail = ParseDateTime(gjson.GetBytes(raw, "krblastfailedauth.0.__datetime__").String())
-	gjson.GetBytes(raw, "memberof_group").ForEach(func(key, value gjson.Result) bool {
+	res := gjson.ParseBytes(raw)
+
+	u.UUID = res.Get("ipauniqueid.0").String()
+	u.DN = res.Get("dn").String()
+	u.First = res.Get("givenname.0").String()
+	u.Last = res.Get("sn.0").String()
+	u.DisplayName = res.Get("displayname.0").String()
+	u.Principal = res.Get("krbprincipalname.0").String()
+	u.Username = res.Get("uid.0").String()
+	u.Uid = res.Get("uidnumber.0").String()
+	u.Gid = res.Get("gidnumber.0").String()
+	u.HasKeytab = res.Get("has_keytab").Bool()
+	u.HasPassword = res.Get("has_password").Bool()
+	u.Locked = res.Get("nsaccountlock").Bool()
+	u.Preserved = res.Get("preserved").Bool()
+	u.HomeDir = res.Get("homedirectory.0").String()
+	u.Email = res.Get("mail.0").String()
+	u.Mobile = res.Get("mobile.0").String()
+	u.TelephoneNumber = res.Get("telephonenumber.0").String()
+	u.Shell = res.Get("loginshell.0").String()
+	u.RandomPassword = res.Get("randompassword").String()
+	u.LastPasswdChange = ParseDateTime(res.Get("krblastpwdchange.0.__datetime__").String())
+	u.PasswdExpire = ParseDateTime(res.Get("krbpasswordexpiration.0.__datetime__").String())
+	u.PrincipalExpire = ParseDateTime(res.Get("krbprincipalexpiration.0.__datetime__").String())
+	u.LastLoginSuccess = ParseDateTime(res.Get("krblastsuccessfulauth.0.__datetime__").String())
+	u.LastLoginFail = ParseDateTime(res.Get("krblastfailedauth.0.__datetime__").String())
+	res.Get("memberof_group").ForEach(func(key, value gjson.Result) bool {
 		u.Groups = append(u.Groups, value.String())
 		return true
 	})
-	gjson.GetBytes(raw, "ipasshpubkey").ForEach(func(key, value gjson.Result) bool {
+	res.Get("ipasshpubkey").ForEach(func(key, value gjson.Result) bool {
 		k, err := NewSSHAuthorizedKey(value.String())
 		if err == nil {
 			u.SSHAuthKeys = append(u.SSHAuthKeys, k)
 		}
 		return true
 	})
-	gjson.GetBytes(raw, "ipauserauthtype").ForEach(func(key, value gjson.Result) bool {
+	res.Get("ipauserauthtype").ForEach(func(key, value gjson.Result) bool {
 		u.AuthTypes = append(u.AuthTypes, value.String())
 		return true
 	})
-	gjson.GetBytes(raw, "memberof_hbacrule").ForEach(func(key, value gjson.Result) bool {
+	res.Get("memberof_hbacrule").ForEach(func(key, value gjson.Result) bool {
 		u.HbacRules = append(u.HbacRules, value.String())
 		return true
 	})
-	gjson.GetBytes(raw, "memberofindirect_hbacrule").ForEach(func(key, value gjson.Result) bool {
+	res.Get("memberofindirect_hbacrule").ForEach(func(key, value gjson.Result) bool {
 		u.HbacRules = append(u.HbacRules, value.String())
 		return true
 	})
-	gjson.GetBytes(raw, "memberofindirect_sudorule").ForEach(func(key, value gjson.Result) bool {
+	res.Get("memberofindirect_sudorule").ForEach(func(key, value gjson.Result) bool {
 		u.SudoRules = append(u.SudoRules, value.String())
 		return true
 	})
