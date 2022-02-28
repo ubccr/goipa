@@ -5,123 +5,85 @@
 package ipa
 
 import (
-	"fmt"
+	"errors"
+	"time"
 
-	"encoding/json"
-	"strings"
+	"github.com/tidwall/gjson"
 )
 
 // OTP Token hash Algorithms supported by FreeIPA
-type Algorithm string
-
 const (
-	AlgorithmSHA1   Algorithm = "SHA1"
-	AlgorithmSHA256           = "SHA256"
-	AlgorithmSHA384           = "SHA384"
-	AlgorithmSHA512           = "SHA512"
+	AlgorithmSHA1   string = "sha1"
+	AlgorithmSHA256        = "sha256"
+	AlgorithmSHA384        = "sha384"
+	AlgorithmSHA512        = "sha512"
 )
 
-// Number of digits each OTP token code will have
-type Digits int
-
+// OTP Token types supported by FreeIPA
 const (
-	DigitsSix   Digits = 6
-	DigitsEight Digits = 8
+	TokenTypeTOTP = "totp"
+	TokenTypeHOTP = "hotp"
 )
 
 // OTPToken encapsulates FreeIPA otptokens
 type OTPToken struct {
-	DN        string    `json:"dn"`
-	Algorithm Algorithm `json:"ipatokenotpalgorithm"`
-	Digits    Digits    `json:"ipatokenotpdigits"`
-	Owner     string    `json:"ipatokenowner"`
-	TimeStep  string    `json:"ipatokentotptimestep"`
-	UUID      string    `json:"ipatokenuniqueid"`
-	ManagedBy string    `json:"managedby_user"`
-	Disabled  string    `json:"ipatokendisabled"`
-	Type      string    `json:"type"`
-	URI       string    `json:"uri"`
+	DN          string    `json:"dn"`
+	UUID        string    `json:"ipatokenuniqueid"`
+	Algorithm   string    `json:"ipatokenotpalgorithm"`
+	Digits      int       `json:"ipatokenotpdigits"`
+	Owner       string    `json:"ipatokenowner"`
+	TimeStep    int       `json:"ipatokentotptimestep"`
+	ClockOffest int       `json:"ipatokentotpclockoffset"`
+	ManagedBy   string    `json:"managedby_user"`
+	Enabled     bool      `json:"-"`
+	Type        string    `json:"type"`
+	URI         string    `json:"uri"`
+	Description string    `json:"description"`
+	Vendor      string    `json:"ipatokenvendor"`
+	Model       string    `json:"ipatokenmodel"`
+	Serial      string    `json:"ipatokenserial"`
+	NotBefore   time.Time `json:"ipatokennotbefore"`
+	NotAfter    time.Time `json:"ipatokennotafter"`
 }
 
-func (t *OTPToken) Enabled() bool {
-	if t.Disabled == "TRUE" {
-		return false
-	}
-
-	return true
+var DefaultTOTPToken *OTPToken = &OTPToken{
+	Type:      TokenTypeTOTP,
+	Algorithm: AlgorithmSHA1,
+	Digits:    6,
+	TimeStep:  30,
 }
 
-// Unmarshal a FreeIPA string from an array of strings and convert to an
-// Algorithm. Uses the first value in the array as the value of the string.
-func (a *Algorithm) UnmarshalJSON(b []byte) error {
-	var values []string
-	err := json.Unmarshal(b, &values)
-	if err != nil {
-		return err
+func (t *OTPToken) fromJSON(raw []byte) error {
+	if !gjson.ValidBytes(raw) {
+		return errors.New("invalid otp token record json")
 	}
 
-	algo := ""
+	res := gjson.ParseBytes(raw)
 
-	if len(values) > 0 {
-		algo = values[0]
-	}
-
-	switch algo {
-	case "sha1":
-		*a = AlgorithmSHA1
-	case "sha256":
-		*a = AlgorithmSHA256
-	case "sha384":
-		*a = AlgorithmSHA384
-	case "sha512":
-		*a = AlgorithmSHA512
-	default:
-		*a = AlgorithmSHA1
-	}
+	t.DN = res.Get("dn").String()
+	t.UUID = res.Get("ipatokenuniqueid.0").String()
+	t.Algorithm = res.Get("ipatokenotpalgorithm.0").String()
+	t.Digits = int(res.Get("ipatokenotpdigits.0").Int())
+	t.Owner = res.Get("ipatokenowner.0").String()
+	t.TimeStep = int(res.Get("ipatokentotptimestep.0").Int())
+	t.ClockOffest = int(res.Get("ipatokentotpclockoffset.0").Int())
+	t.ManagedBy = res.Get("managedby_user.0").String()
+	t.Enabled = "TRUE" != res.Get("ipatokendisabled.0").String()
+	t.Type = res.Get("type").String()
+	t.URI = res.Get("uri").String()
+	t.Description = res.Get("description.0").String()
+	t.Vendor = res.Get("ipatokenvendor.0").String()
+	t.Model = res.Get("ipatokenmodel.0").String()
+	t.Serial = res.Get("ipatokenserial.0").String()
+	t.NotBefore = ParseDateTime(res.Get("ipatokennotbefore.0.__datetime__").String())
+	t.NotAfter = ParseDateTime(res.Get("ipatokennotafter.0.__datetime__").String())
 
 	return nil
-}
-
-func (a *Algorithm) String() string {
-	return string(*a)
-}
-
-// Unmarshal a FreeIPA string from an array of strings and convert to Digits.
-// Uses the first value in the array as the value of the string.
-func (d *Digits) UnmarshalJSON(b []byte) error {
-	var values []string
-	err := json.Unmarshal(b, &values)
-	if err != nil {
-		return err
-	}
-
-	digi := ""
-
-	if len(values) > 0 {
-		digi = values[0]
-	}
-
-	switch digi {
-	case "6":
-		*d = DigitsSix
-	case "8":
-		*d = DigitsEight
-	default:
-		*d = DigitsSix
-	}
-
-	return nil
-}
-
-func (d *Digits) String() string {
-	return fmt.Sprint(*d)
 }
 
 // Remove OTP token
-func (c *Client) RemoveOTPToken(tokenID string) error {
-	options := map[string]interface{}{}
-
-	_, err := c.rpc("otptoken_del", []string{tokenID}, options)
+func (c *Client) RemoveOTPToken(tokenUUID string) error {
+	_, err := c.rpc("otptoken_del", []string{tokenUUID}, nil)
 
 	if err != nil {
 		return err
@@ -131,10 +93,10 @@ func (c *Client) RemoveOTPToken(tokenID string) error {
 }
 
 // Fetch all OTP tokens.
-func (c *Client) FetchOTPTokens(uid string) ([]*OTPToken, error) {
-	options := map[string]interface{}{
-		"ipatokenowner": uid,
-		"all":           true}
+func (c *Client) FetchOTPTokens() ([]*OTPToken, error) {
+	options := Options{
+		"all": true,
+	}
 
 	res, err := c.rpc("otptoken_find", []string{}, options)
 
@@ -142,27 +104,73 @@ func (c *Client) FetchOTPTokens(uid string) ([]*OTPToken, error) {
 		return nil, err
 	}
 
-	var tokens []*OTPToken
-	err = json.Unmarshal(res.Result.Data, &tokens)
-	if err != nil {
-		return nil, err
+	tokens := make([]*OTPToken, 0)
+
+	data := gjson.ParseBytes(res.Result.Data)
+	for _, t := range data.Array() {
+		tok := new(OTPToken)
+		err := tok.fromJSON([]byte(t.Raw))
+		if err != nil {
+			return nil, err
+		}
+
+		tokens = append(tokens, tok)
 	}
 
 	return tokens, nil
 }
 
-// Add TOTP token. Returns new OTPToken
-func (c *Client) AddTOTPToken(uid string, algo Algorithm, digits Digits, interval int) (*OTPToken, error) {
-	options := map[string]interface{}{
-		"type":                 "totp",
-		"ipatokenotpalgorithm": strings.ToLower(string(algo)),
-		"ipatokenotpdigits":    digits,
-		"ipatokentotptimestep": interval,
-		"ipatokenowner":        uid,
+// Add OTP token. Returns new OTPToken
+func (c *Client) AddOTPToken(token *OTPToken) (*OTPToken, error) {
+	if token == nil {
+		token = DefaultTOTPToken
+	}
+	if token.Type == "" {
+		token.Type = DefaultTOTPToken.Type
+	}
+	if token.Algorithm == "" {
+		token.Algorithm = DefaultTOTPToken.Algorithm
+	}
+	if token.Digits == 0 {
+		token.Digits = DefaultTOTPToken.Digits
+	}
+	if token.TimeStep == 0 {
+		token.TimeStep = DefaultTOTPToken.TimeStep
+	}
+
+	options := Options{
+		"type":                 token.Type,
+		"ipatokenotpalgorithm": token.Algorithm,
+		"ipatokenotpdigits":    token.Digits,
+		"ipatokentotptimestep": token.TimeStep,
 		"no_qrcode":            true,
 		"qrcode":               false,
 		"no_members":           false,
-		"all":                  true}
+		"all":                  true,
+	}
+
+	if token.Description != "" {
+		options["description"] = token.Description
+	}
+	if token.Vendor != "" {
+		options["ipatokenvendor"] = token.Vendor
+	}
+	if token.Model != "" {
+		options["ipatokenmodel"] = token.Model
+	}
+	if token.Serial != "" {
+		options["ipatokenserial"] = token.Serial
+	}
+	if !token.NotBefore.IsZero() {
+		options["ipatokennotbefore"] = map[string]interface{}{
+			"__datetime__": token.NotBefore.Format(IpaDatetimeFormat),
+		}
+	}
+	if !token.NotAfter.IsZero() {
+		options["ipatokennotafter"] = map[string]interface{}{
+			"__datetime__": token.NotAfter.Format(IpaDatetimeFormat),
+		}
+	}
 
 	res, err := c.rpc("otptoken_add", []string{}, options)
 
@@ -170,33 +178,35 @@ func (c *Client) AddTOTPToken(uid string, algo Algorithm, digits Digits, interva
 		return nil, err
 	}
 
-	var tokenRec OTPToken
-	err = json.Unmarshal(res.Result.Data, &tokenRec)
+	tokenRec := new(OTPToken)
+	err = tokenRec.fromJSON(res.Result.Data)
 	if err != nil {
 		return nil, err
 	}
 
-	return &tokenRec, nil
+	return tokenRec, nil
 }
 
 // Enable OTP token.
-func (c *Client) EnableOTPToken(tokenID string) error {
-	options := map[string]interface{}{
+func (c *Client) EnableOTPToken(tokenUUID string) error {
+	options := Options{
 		"ipatokendisabled": false,
-		"all":              false}
+		"all":              false,
+	}
 
-	_, err := c.rpc("otptoken_mod", []string{tokenID}, options)
+	_, err := c.rpc("otptoken_mod", []string{tokenUUID}, options)
 
 	return err
 }
 
 // Disable OTP token.
-func (c *Client) DisableOTPToken(tokenID string) error {
-	options := map[string]interface{}{
+func (c *Client) DisableOTPToken(tokenUUID string) error {
+	options := Options{
 		"ipatokendisabled": true,
-		"all":              false}
+		"all":              false,
+	}
 
-	_, err := c.rpc("otptoken_mod", []string{tokenID}, options)
+	_, err := c.rpc("otptoken_mod", []string{tokenUUID}, options)
 
 	return err
 }
