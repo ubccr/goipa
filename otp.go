@@ -92,10 +92,11 @@ func (c *Client) RemoveOTPToken(tokenUUID string) error {
 	return nil
 }
 
-// Fetch all OTP tokens.
-func (c *Client) FetchOTPTokens() ([]*OTPToken, error) {
+// Fetch OTP tokens by owner.
+func (c *Client) FetchOTPTokens(owner string) ([]*OTPToken, error) {
 	options := Options{
-		"all": true,
+		"ipatokenowner": owner,
+		"all":           true,
 	}
 
 	res, err := c.rpc("otptoken_find", []string{}, options)

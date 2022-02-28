@@ -52,7 +52,7 @@ func TestAddTOTPToken(t *testing.T) {
 	assert.Equalf(tokenRec.Description, token.Description, "Invalid description")
 	assert.Equalf(tokenRec.NotBefore.Format(ipa.IpaDatetimeFormat), token.NotBefore.Format(ipa.IpaDatetimeFormat), "Invalid validity start date")
 
-	tokens, err := userClient.FetchOTPTokens()
+	tokens, err := userClient.FetchOTPTokens(username)
 	require.NoErrorf(err, "Failed to fetch OTP tokens for user")
 	assert.Lenf(tokens, 1, "Wrong number of tokens found")
 
