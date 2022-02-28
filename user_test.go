@@ -224,3 +224,29 @@ func TestSSHKeys(t *testing.T) {
 	err = c.UserDelete(false, false, username)
 	assert.NoErrorf(err, "Failed to remove user")
 }
+
+func TestUserFind(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	c, err := newTestClientCCache()
+	require.NoError(err)
+
+	username := gofakeit.Username()
+	userRec, err := addTestUser(c, username, "")
+	require.NoErrorf(err, "Failed to add test user")
+
+	users, err := c.UserFind(ipa.Options{
+		"uid": username,
+	})
+	require.NoErrorf(err, "Failed to find users")
+
+	assert.Lenf(users, 1, "Wrong number of users found")
+	user := users[0]
+	assert.Equalf(user.UUID, userRec.UUID, "UUIDs should be the same")
+	assert.Equalf(user.Username, userRec.Username, "Usernames should be the same")
+	assert.Equalf(user.Uid, userRec.Uid, "Uid's should be the same")
+
+	err = c.UserDelete(false, false, username)
+	assert.NoErrorf(err, "Failed to remove user")
+}

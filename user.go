@@ -234,6 +234,36 @@ func (c *Client) UserShow(username string) (*User, error) {
 	return userRec, nil
 }
 
+// Find users.
+func (c *Client) UserFind(options Options) ([]*User, error) {
+	if options == nil {
+		options = Options{}
+	}
+
+	options["no_members"] = false
+	options["all"] = true
+
+	res, err := c.rpc("user_find", []string{""}, options)
+
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]*User, 0)
+	data := gjson.ParseBytes(res.Result.Data)
+	for _, t := range data.Array() {
+		user := new(User)
+		err := user.fromJSON([]byte(t.Raw))
+		if err != nil {
+			return nil, err
+		}
+
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
 // Reset user password and return new random password
 func (c *Client) ResetPassword(username string) (string, error) {
 
