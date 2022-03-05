@@ -53,6 +53,13 @@ var DefaultTOTPToken *OTPToken = &OTPToken{
 	TimeStep:  30,
 }
 
+func (t *OTPToken) DisplayName() string {
+	if len(t.UUID) == 36 {
+		return t.Owner + "-" + t.UUID[len(t.UUID)-6:]
+	}
+	return t.UUID
+}
+
 func (t *OTPToken) fromJSON(raw []byte) error {
 	if !gjson.ValidBytes(raw) {
 		return errors.New("invalid otp token record json")
