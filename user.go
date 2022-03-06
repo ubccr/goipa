@@ -191,14 +191,18 @@ func (u *User) RemoveSSHAuthorizedKey(fingerprint string) {
 
 // Add ssh authorized key
 func (u *User) AddSSHAuthorizedKey(key *SSHAuthorizedKey) {
-	for _, k := range u.SSHAuthKeys {
+	index := -1
+	for i, k := range u.SSHAuthKeys {
 		if key.Fingerprint == k.Fingerprint {
-			// Key already added
-			return
+			index = i
 		}
 	}
 
-	u.SSHAuthKeys = append(u.SSHAuthKeys, key)
+	if index == -1 {
+		u.SSHAuthKeys = append(u.SSHAuthKeys, key)
+	} else {
+		u.SSHAuthKeys[index] = key
+	}
 }
 
 // Format ssh authorized keys
@@ -477,6 +481,12 @@ func (c *Client) UserMod(user *User) (*User, error) {
 
 	res, err := c.rpc("user_mod", []string{user.Username}, options)
 	if err != nil {
+		if ierr, ok := err.(*IpaError); ok {
+			// error 4202 - no modifications to be performed
+			if ierr.Code == 4202 {
+				return user, nil
+			}
+		}
 		return nil, err
 	}
 
