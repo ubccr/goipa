@@ -47,7 +47,7 @@ func main() {
 
 Development and testing goipa uses docker-compose. The scripts to spin up a
 FreeIPA test server in docker were copied/adopted from [this great repository](https://github.com/adelton/webauthinfra). 
-Most of the scripts in `contianer/` directory are written by Jan Pazdziora and
+Most of the scripts in `container/` directory are written by Jan Pazdziora and
 licensed under Apache 2.0 and modified for use with goipa.
 
 NOTE: The containers are NOT meant to be run in production and used solely for
@@ -57,7 +57,7 @@ To get started hacking on goipa and running the test suite:
 
 ```
 $ cp .env.sample .env
-[edit to taste. and passwords and ssh key]
+[edit to taste. add passwords and ssh key]
 
 $ docker-compose build
 $ docker-compose up -d
