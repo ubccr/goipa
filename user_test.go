@@ -15,9 +15,11 @@ import (
 )
 
 func addTestUser(c *ipa.Client, username, password string) (*ipa.User, error) {
-	first := gofakeit.FirstName()
-	last := gofakeit.LastName()
-	rec, err := c.UserAdd(username, "", first, last, "", "", password != "")
+	user := *ipa.User{}
+	user.Username = username
+	user.First = gofakeit.FirstName()
+	user.Last = gofakeit.LastName()
+	rec, err := c.UserAdd(user, password != "")
 	if err != nil {
 		return nil, err
 	}
@@ -115,33 +117,31 @@ func TestUserAdd(t *testing.T) {
 	c, err := newTestClientCCache()
 	require.NoError(err)
 
-	username := gofakeit.Username()
-	email := gofakeit.Email()
-	first := gofakeit.FirstName()
-	last := gofakeit.LastName()
-	home := "/user/" + username
-	shell := "/bin/bash"
+	user := *ipa.User{}
+	user.Username = gofakeit.Username()
+	user.Email = gofakeit.Email()
+	user.First = gofakeit.FirstName()
+	user.Last = gofakeit.LastName()
+	user.Home = "/user/" + username
+	user.Shell = "/bin/bash"
 	password := gofakeit.Password(true, true, true, true, false, 16)
 
-	rec, err := c.UserAdd(username, email, first, last, home, shell, true)
+	rec, err := c.UserAddWithPassword(user, password)
 	require.NoErrorf(err, "Failed to add user")
 
-	assert.Equalf(strings.ToLower(username), rec.Username, "User username invalid")
-	assert.Equalf(email, rec.Email, "Email is invalid")
-	assert.Equalf(first, rec.First, "First name is invalid")
-	assert.Equalf(last, rec.Last, "Last name is invalid")
-	assert.Equalf(home, rec.HomeDir, "Homedir is invalid")
-	assert.Equalf(shell, rec.Shell, "Shell is invalid")
-
-	err = c.SetPassword(username, rec.RandomPassword, password, "")
-	assert.NoErrorf(err, "Failed to set password")
+	assert.Equalf(strings.ToLower(user.Username), rec.Username, "User username invalid")
+	assert.Equalf(user.Email, rec.Email, "Email is invalid")
+	assert.Equalf(user.First, rec.First, "First name is invalid")
+	assert.Equalf(user.Last, rec.Last, "Last name is invalid")
+	assert.Equalf(user.HomeDir, rec.HomeDir, "Homedir is invalid")
+	assert.Equalf(user.Shell, rec.Shell, "Shell is invalid")
 
 	userClient := ipa.NewDefaultClient()
-	err = userClient.RemoteLogin(username, password)
+	err = userClient.RemoteLogin(user.Username, password)
 	require.NoErrorf(err, "Failed to login as new user account")
 	assert.NotEmptyf(c.SessionID(), "Missing sessionID for new user account")
 
-	err = c.UserDelete(false, false, username)
+	err = c.UserDelete(false, false, user.Username)
 	assert.NoErrorf(err, "Failed to remove user")
 }
 

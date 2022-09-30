@@ -43,6 +43,7 @@ type User struct {
 	TelephoneNumber  string              `json:"telephonenumber"`
 	Mobile           string              `json:"mobile"`
 	Shell            string              `json:"loginshell"`
+	Category         string              `json:"userclass"`
 	SudoRules        []string            `json:"memberofindirect_sudorule"`
 	HbacRules        []string            `json:"memberofindirect_hbacrule"`
 	LastPasswdChange time.Time           `json:"krblastpwdchange"`
@@ -92,6 +93,23 @@ func (k *SSHAuthorizedKey) MarshalJSON() ([]byte, error) {
 	return json.Marshal(k.String())
 }
 
+func (u *User) ToOptions() Options {
+	options := Options{
+		"mail":            u.Email,
+		"givenname":       u.First,
+		"sn":              u.Last,
+		"homedirectory":   u.HomeDir,
+		"loginshell":      u.Shell,
+		"displayname":     u.DisplayName,
+		"ipasshpubkey":    u.FormatSSHAuthorizedKeys(),
+		"telephonenumber": u.TelephoneNumber,
+		"mobile":          u.Mobile,
+		"userclass":       u.Category,
+	}
+
+	return options
+}
+
 func (u *User) fromJSON(raw []byte) error {
 	if !gjson.ValidBytes(raw) {
 		return errors.New("invalid user record json")
@@ -117,6 +135,7 @@ func (u *User) fromJSON(raw []byte) error {
 	u.Mobile = res.Get("mobile.0").String()
 	u.TelephoneNumber = res.Get("telephonenumber.0").String()
 	u.Shell = res.Get("loginshell.0").String()
+	u.Category = res.Get("userclass.0").String()
 	u.RandomPassword = res.Get("randompassword").String()
 	u.LastPasswdChange = ParseDateTime(res.Get("krblastpwdchange.0.__datetime__").String())
 	u.PasswdExpire = ParseDateTime(res.Get("krbpasswordexpiration.0.__datetime__").String())
@@ -362,7 +381,7 @@ func (c *Client) SetPassword(username, old_passwd, new_passwd, otpcode string) e
 	} else if status == "invalid-password" {
 		return ErrInvalidPassword
 	} else if strings.ToLower(status) != "ok" {
-		return errors.New("ipa: change password failed. Unknown status")
+		return fmt.Errorf("ipa: change password failed. Unknown status: %s", status)
 	}
 
 	return nil
@@ -411,29 +430,49 @@ func (c *Client) UserEnable(username string) error {
 	return nil
 }
 
+// Add new user and set password. Note this requires "User Administrators"
+// Privilege in FreeIPA.
+func (c *Client) UserAddWithPassword(user *User, password string) (*User, error) {
+	if user.Username == "" {
+		return nil, errors.New("Username is required")
+	}
+	if password == "" {
+		return nil, errors.New("password is required")
+	}
+
+	rec, err := c.UserAdd(user, true)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.SetPassword(rec.Username, rec.RandomPassword, password, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return rec, nil
+}
+
 // Add new user. If random is true a random password will be created for the
 // user. Note this requires "User Administrators" Privilege in FreeIPA.
-func (c *Client) UserAdd(username, email, first, last, homedir, shell string, random bool) (*User, error) {
-	var options = Options{
-		"mail":      email,
-		"givenname": first,
-		"sn":        last,
+func (c *Client) UserAdd(user *User, random bool) (*User, error) {
+	if user.Username == "" {
+		return nil, errors.New("Username is required")
 	}
 
-	if len(homedir) > 0 {
-		options["homedirectory"] = homedir
-	}
-
-	if len(shell) > 0 {
-		options["loginshell"] = shell
-	}
+	options := user.ToOptions()
 
 	if random {
 		options["random"] = true
 	}
 
-	res, err := c.rpc("user_add", []string{username}, options)
+	res, err := c.rpc("user_add", []string{user.Username}, options)
 	if err != nil {
+		if ierr, ok := err.(*IpaError); ok {
+			if ierr.Code == 4002 {
+				return nil, ErrUserExists
+			}
+		}
 		return nil, err
 	}
 
@@ -467,17 +506,11 @@ func (c *Client) UserDelete(preserve, stopOnError bool, usernames ...string) err
 // givenname, sn, homedirectory, loginshell, displayname, ipasshpubkey,
 // telephonenumber, and mobile
 func (c *Client) UserMod(user *User) (*User, error) {
-	var options = Options{
-		"mail":            user.Email,
-		"givenname":       user.First,
-		"sn":              user.Last,
-		"homedirectory":   user.HomeDir,
-		"loginshell":      user.Shell,
-		"displayname":     user.DisplayName,
-		"ipasshpubkey":    user.FormatSSHAuthorizedKeys(),
-		"telephonenumber": user.TelephoneNumber,
-		"mobile":          user.Mobile,
+	if user.Username == "" {
+		return nil, errors.New("Username is required")
 	}
+
+	options := user.ToOptions()
 
 	res, err := c.rpc("user_mod", []string{user.Username}, options)
 	if err != nil {

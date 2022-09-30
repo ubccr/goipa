@@ -53,6 +53,9 @@ var (
 
 	// ErrUnauthorized is returned when user is not authorized
 	ErrUnauthorized = errors.New("unauthorized")
+
+	// ErrUserExists is returned when user account already exists
+	ErrUserExists = errors.New("unauthorized")
 )
 
 // FreeIPA Client
