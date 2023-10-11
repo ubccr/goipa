@@ -75,7 +75,7 @@ func (t *OTPToken) fromJSON(raw []byte) error {
 	t.TimeStep = int(res.Get("ipatokentotptimestep.0").Int())
 	t.ClockOffest = int(res.Get("ipatokentotpclockoffset.0").Int())
 	t.ManagedBy = res.Get("managedby_user.0").String()
-	t.Enabled = "TRUE" != res.Get("ipatokendisabled.0").String()
+	t.Enabled = !res.Get("ipatokendisabled.0").Bool()
 	t.Type = res.Get("type").String()
 	t.URI = res.Get("uri").String()
 	t.Description = res.Get("description.0").String()
