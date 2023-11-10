@@ -22,7 +22,7 @@ import (
 
 // User encapsulates user data returned from ipa user commands
 type User struct {
-	UUID             string              `json:"ipauniqueid"`
+	UUID             string              `json:"ipauniq2ueid"`
 	DN               string              `json:"dn"`
 	First            string              `json:"givenname"`
 	Last             string              `json:"sn"`
