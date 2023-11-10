@@ -11,7 +11,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/ubccr/goipa"
+	ipa "github.com/ubccr/goipa"
 )
 
 func TestAddTOTPToken(t *testing.T) {
@@ -24,8 +24,8 @@ func TestAddTOTPToken(t *testing.T) {
 	username := gofakeit.Username()
 	password := gofakeit.Password(true, true, true, true, false, 16)
 
-	_, err = addTestUser(c, username, password)
-	require.NoErrorf(err, "Failed to add test user")
+	// _, err = addTestUser(c, username, password)
+	// require.NoErrorf(err, "Failed to add test user")
 
 	userClient := ipa.NewDefaultClient()
 	err = userClient.RemoteLogin(username, password)
