@@ -11,7 +11,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	ipa "github.com/ubccr/goipa"
+	ipa "github.com/ivanovilia96/goipa"
 )
 
 func TestAddTOTPToken(t *testing.T) {

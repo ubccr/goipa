@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
+	ipa "github.com/ivanovilia96/goipa"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	ipa "github.com/ubccr/goipa"
 )
 
 func addTestUser(c *ipa.Client, username, password string) (*ipa.User, error) {
