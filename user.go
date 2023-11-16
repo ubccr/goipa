@@ -23,14 +23,16 @@ import (
 // User encapsulates user data returned from ipa user commands
 type User struct {
 	UUID              string `json:"ipauniqueid"`
-	Employeenumber    string `json:"employeenumber"`
+	EmployeeNumber    string `json:"employeenumber"`
 	CN                string `json:"cn"`
 	Gecos             string `json:"gecos"`
 	Title             string `json:"title"`
 	DepartmentNumber  string `json:"departmentnumber"`
-	L                 string `json:"l"`
+	L                 string `json:"l"` // town
 	EmployeeID        string `json:"employeeID"`
 	PreferredLanguage string `json:"preferredlanguage"`
+	OU                string `json:"ou"`
+	SetAttr           string `json:"setattr"`
 
 	DN               string              `json:"dn"`
 	First            string              `json:"givenname"`
