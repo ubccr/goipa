@@ -142,17 +142,17 @@ func (u *User) ToOptions() Options {
 		"krblastpwdchange":          u.LastPasswdChange.String(),
 		"krbpasswordexpiration":     u.PasswdExpire.String(),
 		"krbprincipalexpiration":    u.PrincipalExpire.String(),
-		"krblastsuccessfulauth":     u.LastLoginSuccess.String(),
-		"krblastfailedauth":         u.LastLoginFail.String(),
-		"randompassword":            u.RandomPassword,
+		// "krblastsuccessfulauth":     u.LastLoginSuccess.String(),
+		// "krblastfailedauth":         u.LastLoginFail.String(),
+		"randompassword": u.RandomPassword,
 	}
 
-	for key, val := range options {
-		vasS, ok := val.(string)
-		if ok && len(vasS) == 0 {
-			delete(options, key)
-		}
-	}
+	// for key, val := range options {
+	// 	vasS, ok := val.(string)
+	// 	if ok && len(vasS) == 0 {
+	// 		delete(options, key)
+	// 	}
+	// }
 
 	return options
 }
