@@ -126,7 +126,7 @@ func (u *User) ToOptions() Options {
 		"preferredlanguage": u.PreferredLanguage,
 		"ou":                u.OU,
 		"setattr":           u.SetAttr,
-		"dn":                u.DN,
+		// "dn":                u.DN,
 		"krbprincipalname":  u.Principal,
 		"uid":               u.Username,
 		"uidnumber":         u.Uid,
