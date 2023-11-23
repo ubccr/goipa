@@ -137,14 +137,14 @@ func (u *User) ToOptions() Options {
 		// "has_password":      u.HasPassword,
 		"nsaccountlock":     u.Locked,
 		// "preserved":                 u.Preserved,
-		"memberofindirect_sudorule": u.SudoRules,
-		"memberofindirect_hbacrule": u.HbacRules,
-		"krblastpwdchange":          u.LastPasswdChange.String(),
+		// "memberofindirect_sudorule": u.SudoRules,
+		// "memberofindirect_hbacrule": u.HbacRules,
+		// "krblastpwdchange":          u.LastPasswdChange.String(),
 		"krbpasswordexpiration":     u.PasswdExpire.String(),
 		"krbprincipalexpiration":    u.PrincipalExpire.String(),
 		// "krblastsuccessfulauth":     u.LastLoginSuccess.String(),
 		// "krblastfailedauth":         u.LastLoginFail.String(),
-		"randompassword": u.RandomPassword,
+		// "randompassword": u.RandomPassword,
 	}
 
 	// for key, val := range options {
