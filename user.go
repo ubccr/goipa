@@ -122,7 +122,7 @@ func (u *User) ToOptions() Options {
 		"title":             u.Title,
 		"departmentnumber":  u.DepartmentNumber,
 		"l":                 u.L,
-		"employeeID":        u.EmployeeID,
+		// "employeeID":        u.EmployeeID,
 		"preferredlanguage": u.PreferredLanguage,
 		"ou":                u.OU,
 		"setattr":           u.SetAttr,
