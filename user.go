@@ -147,6 +147,13 @@ func (u *User) ToOptions() Options {
 		"randompassword":            u.RandomPassword,
 	}
 
+	for key, val := range options {
+		vasS, ok := val.(string)
+		if ok && len(vasS) == 0 {
+			delete(options, key)
+		}
+	}
+
 	return options
 }
 
