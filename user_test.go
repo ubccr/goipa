@@ -38,7 +38,7 @@ func TestUserShow(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	rec, err := c.UserShow(TestEnvAdminUser)
@@ -51,7 +51,7 @@ func TestUserAuthTypes(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()
@@ -77,7 +77,7 @@ func TestUserMod(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()
@@ -114,7 +114,7 @@ func TestUserAdd(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	user := ipa.User{}
@@ -136,7 +136,7 @@ func TestUserAdd(t *testing.T) {
 	assert.Equalf(user.HomeDir, rec.HomeDir, "Homedir is invalid")
 	assert.Equalf(user.Shell, rec.Shell, "Shell is invalid")
 
-	userClient := ipa.NewDefaultClient()
+	userClient := ipa.NewDefaultClient(false)
 	err = userClient.RemoteLogin(user.Username, password)
 	require.NoErrorf(err, "Failed to login as new user account")
 	assert.NotEmptyf(c.SessionID(), "Missing sessionID for new user account")
@@ -149,7 +149,7 @@ func TestUserLock(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()
@@ -168,7 +168,7 @@ func TestUserLock(t *testing.T) {
 
 	assert.Truef(rec.Locked, "Account should be locked")
 
-	userClient := ipa.NewDefaultClient()
+	userClient := ipa.NewDefaultClient(false)
 	err = userClient.RemoteLogin(username, password)
 	assert.Errorf(err, "User should not be able to login")
 
@@ -180,7 +180,7 @@ func TestUserLock(t *testing.T) {
 
 	assert.Falsef(rec.Locked, "Account should not be disabled")
 
-	userClient = ipa.NewDefaultClient()
+	userClient = ipa.NewDefaultClient(false)
 	err = userClient.RemoteLogin(username, password)
 	assert.NoErrorf(err, "User should be able to login")
 
@@ -192,7 +192,7 @@ func TestSSHKeys(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()
@@ -229,7 +229,7 @@ func TestUserFind(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()

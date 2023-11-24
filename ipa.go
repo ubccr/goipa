@@ -116,8 +116,9 @@ func init() {
 	}
 }
 
-func newHTTPClient() *http.Client {
+func newHTTPClient(offCertCheck bool) *http.Client {
 	return &http.Client{
+
 		Timeout: 1 * time.Minute,
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
@@ -129,40 +130,43 @@ func newHTTPClient() *http.Client {
 			IdleConnTimeout:       90 * time.Second,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
-			TLSClientConfig:       &tls.Config{RootCAs: ipaCertPool},
-			DisableCompression:    false,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: offCertCheck,
+				RootCAs:            ipaCertPool,
+			},
+			DisableCompression: false,
 		},
 	}
 }
 
 // New default IPA Client using host and realm from /etc/ipa/default.conf
-func NewDefaultClient() *Client {
+func NewDefaultClient(offCertCheck bool) *Client {
 	return &Client{
 		host:       ipaDefaultHost,
 		realm:      ipaDefaultRealm,
 		sticky:     true,
-		httpClient: newHTTPClient(),
+		httpClient: newHTTPClient(offCertCheck),
 	}
 }
 
 // New default IPA Client with existing sessionID using host and realm from /etc/ipa/default.conf
-func NewDefaultClientWithSession(sessionID string) *Client {
+func NewDefaultClientWithSession(sessionID string, offCertCheck bool) *Client {
 	return &Client{
 		host:       ipaDefaultHost,
 		realm:      ipaDefaultRealm,
-		httpClient: newHTTPClient(),
+		httpClient: newHTTPClient(offCertCheck),
 		sticky:     true,
 		sessionID:  sessionID,
 	}
 }
 
 // New IPA Client with host and realm
-func NewClient(host, realm string) *Client {
+func NewClient(host, realm string, offCertCheck bool) *Client {
 	return &Client{
 		host:       host,
 		realm:      realm,
 		sticky:     true,
-		httpClient: newHTTPClient(),
+		httpClient: newHTTPClient(offCertCheck),
 	}
 }
 
