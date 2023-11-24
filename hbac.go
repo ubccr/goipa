@@ -6,6 +6,20 @@ func (c *Client) HbacRuleAdd(name string) error {
 	return err
 }
 
+func (c *Client) HbacRuleAddHost(hbacRuleName, hostgroupName string) error {
+	_, err := c.rpc("hbacrule_add_host", []string{hbacRuleName}, map[string]interface{}{
+		"hostgroup": hostgroupName,
+	})
+	return err
+}
+
+func (c *Client) HbacRuleAddService(hbacRuleName, hbacsvcgroup string) error {
+	_, err := c.rpc("hbacrule_add_service", []string{hbacRuleName}, map[string]interface{}{
+		"hbacsvcgroup": hbacsvcgroup,
+	})
+	return err
+}
+
 func (c *Client) HbacRuleDelete(name string) error {
 	_, err := c.rpc("hbacrule_del", []string{name}, map[string]interface{}{})
 	return err
