@@ -63,6 +63,7 @@ type User struct {
 	LastLoginSuccess time.Time           `json:"krblastsuccessfulauth"`
 	LastLoginFail    time.Time           `json:"krblastfailedauth"`
 	RandomPassword   string              `json:"randompassword"`
+	Version          string              `json:"version"`
 }
 
 // SSH Public Key
@@ -145,6 +146,7 @@ func (u *User) ToOptions() Options {
 		// "krblastsuccessfulauth":     u.LastLoginSuccess.String(),
 		// "krblastfailedauth":         u.LastLoginFail.String(),
 		// "randompassword": u.RandomPassword,
+		"version": u.Version,
 	}
 
 	for key, val := range options {
