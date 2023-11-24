@@ -438,11 +438,11 @@ func (c *Client) LoginFromCCache(cpath string) error {
 // Parse a FreeIPA datetime. Datetimes in FreeIPA are returned using a
 // class-hint system. Values are stored as an array with a single element
 // indicating the type and value, for example, '[{"__datetime__": "YYYY-MM-DDTHH:MM:SSZ"]}'
-func ParseDateTime(str string) time.Time {
+func ParseDateTime(str string) *time.Time {
 	dt, err := time.Parse(IpaDatetimeFormat, str)
 	if err != nil {
-		return time.Time{}
+		return nil
 	}
 
-	return dt
+	return &dt
 }

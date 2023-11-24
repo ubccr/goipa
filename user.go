@@ -57,11 +57,11 @@ type User struct {
 	Category         string              `json:"userclass"`
 	SudoRules        []string            `json:"memberofindirect_sudorule"`
 	HbacRules        []string            `json:"memberofindirect_hbacrule"`
-	LastPasswdChange time.Time           `json:"krblastpwdchange"`
-	PasswdExpire     time.Time           `json:"krbpasswordexpiration"`
-	PrincipalExpire  time.Time           `json:"krbprincipalexpiration"`
-	LastLoginSuccess time.Time           `json:"krblastsuccessfulauth"`
-	LastLoginFail    time.Time           `json:"krblastfailedauth"`
+	LastPasswdChange *time.Time          `json:"krblastpwdchange"`
+	PasswdExpire     *time.Time          `json:"krbpasswordexpiration"`
+	PrincipalExpire  *time.Time          `json:"krbprincipalexpiration"`
+	LastLoginSuccess *time.Time          `json:"krblastsuccessfulauth"`
+	LastLoginFail    *time.Time          `json:"krblastfailedauth"`
 	RandomPassword   string              `json:"randompassword"`
 	Version          string              `json:"version"`
 }
@@ -141,12 +141,18 @@ func (u *User) ToOptions() Options {
 		// "memberofindirect_sudorule": u.SudoRules,
 		// "memberofindirect_hbacrule": u.HbacRules,
 		// "krblastpwdchange":          u.LastPasswdChange.String(),
-		"krbpasswordexpiration":  u.PasswdExpire.Format(time.RFC3339),
-		"krbprincipalexpiration": u.PrincipalExpire.Format(time.RFC3339),
 		// "krblastsuccessfulauth":     u.LastLoginSuccess.String(),
 		// "krblastfailedauth":         u.LastLoginFail.String(),
 		// "randompassword": u.RandomPassword,
 		"version": u.Version,
+	}
+
+	if u.PasswdExpire != nil {
+		options["krbpasswordexpiration"] = u.PasswdExpire.Format(time.RFC3339)
+	}
+
+	if u.PrincipalExpire != nil {
+		options["krbprincipalexpiration"] = u.PrincipalExpire.Format(time.RFC3339)
 	}
 
 	for key, val := range options {
