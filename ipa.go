@@ -332,6 +332,10 @@ func (c *Client) RemoteLogin(uid, passwd string) error {
 
 	form := url.Values{"user": {uid}, "password": {passwd}}
 	req, err := http.NewRequest("POST", ipaUrl, strings.NewReader(form.Encode()))
+	if err != nil{
+	return err	
+	}
+	
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.host))
 
