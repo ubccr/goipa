@@ -16,6 +16,7 @@ import (
 
 func addTestUser(c *ipa.Client, username, password string) (*ipa.User, error) {
 	user := ipa.User{}
+	
 	user.Username = username
 	user.First = gofakeit.FirstName()
 	user.Last = gofakeit.LastName()
