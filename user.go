@@ -22,7 +22,18 @@ import (
 
 // User encapsulates user data returned from ipa user commands
 type User struct {
-	UUID             string              `json:"ipauniqueid"`
+	UUID              string `json:"ipauniqueid"`
+	EmployeeNumber    string `json:"employeenumber"`
+	CN                string `json:"cn"`
+	Gecos             string `json:"gecos"`
+	Title             string `json:"title"`
+	DepartmentNumber  string `json:"departmentnumber"`
+	L                 string `json:"l"` // town
+	EmployeeID        string `json:"employeeID"`
+	PreferredLanguage string `json:"preferredlanguage"`
+	OU                string `json:"ou"`
+	SetAttr           string `json:"setattr"`
+
 	DN               string              `json:"dn"`
 	First            string              `json:"givenname"`
 	Last             string              `json:"sn"`
@@ -46,12 +57,13 @@ type User struct {
 	Category         string              `json:"userclass"`
 	SudoRules        []string            `json:"memberofindirect_sudorule"`
 	HbacRules        []string            `json:"memberofindirect_hbacrule"`
-	LastPasswdChange time.Time           `json:"krblastpwdchange"`
-	PasswdExpire     time.Time           `json:"krbpasswordexpiration"`
-	PrincipalExpire  time.Time           `json:"krbprincipalexpiration"`
-	LastLoginSuccess time.Time           `json:"krblastsuccessfulauth"`
-	LastLoginFail    time.Time           `json:"krblastfailedauth"`
+	LastPasswdChange *time.Time          `json:"krblastpwdchange"`
+	PasswdExpire     *time.Time          `json:"krbpasswordexpiration"`
+	PrincipalExpire  *time.Time          `json:"krbprincipalexpiration"`
+	LastLoginSuccess *time.Time          `json:"krblastsuccessfulauth"`
+	LastLoginFail    *time.Time          `json:"krblastfailedauth"`
 	RandomPassword   string              `json:"randompassword"`
+	Version          string              `json:"version"`
 }
 
 // SSH Public Key
@@ -98,6 +110,7 @@ func (u *User) ToOptions() Options {
 		"mail":            u.Email,
 		"givenname":       u.First,
 		"sn":              u.Last,
+		"cn":              u.CN,
 		"homedirectory":   u.HomeDir,
 		"loginshell":      u.Shell,
 		"displayname":     u.DisplayName,
@@ -105,6 +118,48 @@ func (u *User) ToOptions() Options {
 		"telephonenumber": u.TelephoneNumber,
 		"mobile":          u.Mobile,
 		"userclass":       u.Category,
+
+		"gecos":            u.Gecos,
+		"title":            u.Title,
+		"departmentnumber": u.DepartmentNumber,
+		"l":                u.L,
+		// "employeeID":        u.EmployeeID,
+		"preferredlanguage": u.PreferredLanguage,
+		"ou":                u.OU,
+		"setattr":           u.SetAttr,
+		// "dn":                u.DN,
+		"krbprincipalname": u.Principal,
+		// "uid":               u.Username,
+		"uidnumber": u.Uid,
+		"gidnumber": u.Gid,
+		// "memberof_group":    u.Groups,
+		"ipauserauthtype": u.AuthTypes,
+		// "has_keytab":        u.HasKeytab,
+		// "has_password":      u.HasPassword,
+		"nsaccountlock": u.Locked,
+		// "preserved":                 u.Preserved,
+		// "memberofindirect_sudorule": u.SudoRules,
+		// "memberofindirect_hbacrule": u.HbacRules,
+		// "krblastpwdchange":          u.LastPasswdChange.String(),
+		// "krblastsuccessfulauth":     u.LastLoginSuccess.String(),
+		// "krblastfailedauth":         u.LastLoginFail.String(),
+		// "randompassword": u.RandomPassword,
+		"version": u.Version,
+	}
+
+	if u.PasswdExpire != nil {
+		options["krbpasswordexpiration"] = u.PasswdExpire.Format(time.RFC3339)
+	}
+
+	if u.PrincipalExpire != nil {
+		options["krbprincipalexpiration"] = u.PrincipalExpire.Format(time.RFC3339)
+	}
+
+	for key, val := range options {
+		vasS, ok := val.(string)
+		if ok && len(vasS) == 0 {
+			delete(options, key)
+		}
 	}
 
 	return options

@@ -82,8 +82,13 @@ func (t *OTPToken) fromJSON(raw []byte) error {
 	t.Vendor = res.Get("ipatokenvendor.0").String()
 	t.Model = res.Get("ipatokenmodel.0").String()
 	t.Serial = res.Get("ipatokenserial.0").String()
-	t.NotBefore = ParseDateTime(res.Get("ipatokennotbefore.0.__datetime__").String())
-	t.NotAfter = ParseDateTime(res.Get("ipatokennotafter.0.__datetime__").String())
+
+	// parsedTime := ParseDateTime(res.Get("ipatokennotbefore.0.__datetime__"))
+	// if parsedTime != nil{
+	// 	t.NotBefore = parsedTime.String()
+	// }
+
+	// t.NotAfter = ParseDateTime(res.Get("ipatokennotafter.0.__datetime__").String())
 
 	return nil
 }
