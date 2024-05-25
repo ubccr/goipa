@@ -10,11 +10,11 @@ import (
 	"os/user"
 	"testing"
 
+	ipa "github.com/ivanovilia96/goipa"
 	_ "github.com/joho/godotenv/autoload"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/ubccr/goipa"
 )
 
 var (
@@ -31,8 +31,8 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
-func newTestClientUserPassword() (*ipa.Client, error) {
-	c := ipa.NewDefaultClient()
+func newTestClientUserPassword(offCertCheck bool) (*ipa.Client, error) {
+	c := ipa.NewDefaultClient(offCertCheck)
 
 	err := c.Login(TestEnvAdminUser, TestEnvAdminPass)
 	if err != nil {
@@ -46,8 +46,8 @@ func newTestClientUserPassword() (*ipa.Client, error) {
 	return c, nil
 }
 
-func newTestClientKeytab() (*ipa.Client, error) {
-	c := ipa.NewDefaultClient()
+func newTestClientKeytab(offCertCheck bool) (*ipa.Client, error) {
+	c := ipa.NewDefaultClient(offCertCheck)
 
 	err := c.LoginWithKeytab(TestEnvKeytabFile, TestEnvKeytabUser)
 	if err != nil {
@@ -61,8 +61,8 @@ func newTestClientKeytab() (*ipa.Client, error) {
 	return c, nil
 }
 
-func newTestClientCCache() (*ipa.Client, error) {
-	c := ipa.NewDefaultClient()
+func newTestClientCCache(offCertCheck bool) (*ipa.Client, error) {
+	c := ipa.NewDefaultClient(offCertCheck)
 	user, err := user.Current()
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func TestLoginWithPassword(t *testing.T) {
 		t.Skip("Admin user/pass not set. Skipping")
 	}
 
-	_, err := newTestClientUserPassword()
+	_, err := newTestClientUserPassword(false)
 	assert.NoError(t, err)
 }
 
@@ -94,7 +94,7 @@ func TestLoginWithKeytab(t *testing.T) {
 		t.Skip("Admin user/keytab not set. Skipping")
 	}
 
-	_, err := newTestClientKeytab()
+	_, err := newTestClientKeytab(false)
 	assert.NoError(t, err)
 }
 
@@ -103,7 +103,7 @@ func TestLoginWithCCache(t *testing.T) {
 	require.NoError(t, err)
 	require.FileExistsf(t, fmt.Sprintf("/tmp/krb5cc_%s", user.Uid), "Missing KRB5CCACHE file")
 
-	_, err = newTestClientCCache()
+	_, err = newTestClientCCache(false)
 	assert.NoError(t, err)
 }
 
@@ -112,7 +112,7 @@ func TestRemoteLogin(t *testing.T) {
 		t.Skip("Admin user/pass not set. Skipping")
 	}
 
-	c := ipa.NewDefaultClient()
+	c := ipa.NewDefaultClient(false)
 	err := c.RemoteLogin(TestEnvAdminUser, TestEnvAdminPass)
 	require.NoError(t, err)
 	assert.NotEmptyf(t, c.SessionID(), "Missing sessionID")
@@ -122,7 +122,7 @@ func TestPing(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	res, err := c.Ping()

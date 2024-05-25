@@ -55,7 +55,7 @@ var (
 	ErrUnauthorized = errors.New("unauthorized")
 
 	// ErrUserExists is returned when user account already exists
-	ErrUserExists = errors.New("unauthorized")
+	ErrUserExists = errors.New("user exists")
 )
 
 // FreeIPA Client
@@ -67,6 +67,12 @@ type Client struct {
 	sticky     bool
 	httpClient *http.Client
 	krbClient  *client.Client
+
+	remoteLoginCreds
+}
+
+type remoteLoginCreds struct {
+	uid, passwd string
 }
 
 // FreeIPA api options map
@@ -116,8 +122,9 @@ func init() {
 	}
 }
 
-func newHTTPClient() *http.Client {
+func newHTTPClient(offCertCheck bool) *http.Client {
 	return &http.Client{
+
 		Timeout: 1 * time.Minute,
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
@@ -129,40 +136,43 @@ func newHTTPClient() *http.Client {
 			IdleConnTimeout:       90 * time.Second,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
-			TLSClientConfig:       &tls.Config{RootCAs: ipaCertPool},
-			DisableCompression:    false,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: offCertCheck,
+				RootCAs:            ipaCertPool,
+			},
+			DisableCompression: false,
 		},
 	}
 }
 
 // New default IPA Client using host and realm from /etc/ipa/default.conf
-func NewDefaultClient() *Client {
+func NewDefaultClient(offCertCheck bool) *Client {
 	return &Client{
 		host:       ipaDefaultHost,
 		realm:      ipaDefaultRealm,
 		sticky:     true,
-		httpClient: newHTTPClient(),
+		httpClient: newHTTPClient(offCertCheck),
 	}
 }
 
 // New default IPA Client with existing sessionID using host and realm from /etc/ipa/default.conf
-func NewDefaultClientWithSession(sessionID string) *Client {
+func NewDefaultClientWithSession(sessionID string, offCertCheck bool) *Client {
 	return &Client{
 		host:       ipaDefaultHost,
 		realm:      ipaDefaultRealm,
-		httpClient: newHTTPClient(),
+		httpClient: newHTTPClient(offCertCheck),
 		sticky:     true,
 		sessionID:  sessionID,
 	}
 }
 
 // New IPA Client with host and realm
-func NewClient(host, realm string) *Client {
+func NewClient(host, realm string, offCertCheck bool) *Client {
 	return &Client{
 		host:       host,
 		realm:      realm,
 		sticky:     true,
-		httpClient: newHTTPClient(),
+		httpClient: newHTTPClient(offCertCheck),
 	}
 }
 
@@ -209,6 +219,10 @@ func (c *Client) rpc(method string, params []string, options Options) (*Response
 	}
 
 	req, err := http.NewRequest("POST", ipaUrl, bytes.NewBuffer(b))
+	if err != nil {
+		return nil, err
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa/xml", c.host))
 
@@ -232,7 +246,29 @@ func (c *Client) rpc(method string, params []string, options Options) (*Response
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("IPA RPC called failed with HTTP status code: %d", res.StatusCode)
+		//todo если потребуется переписать
+		println("ошибка при выполнении rpc метода, далее будет 5 попыток с попыткой обновить sessionID")
+
+		attemptsCount := 5
+		for i := 1; i <= attemptsCount; i++ {
+			err = c.RefreshSessionID()
+			if err != nil {
+				println("ошибка при попытке обновить sessionID, err: ", err.Error())
+			}
+
+			resp, err := c.rpc(method, params, options)
+			if err == nil {
+				println("успех при вызове rpc метода на попытке: ", i)
+				return resp, nil
+			}
+
+			if i == attemptsCount {
+				println("неудача вызова рпс метода и все попытки были неудачны, кол-во сделанных попыток: ", i)
+				return nil, err
+			}
+
+			time.Sleep(1 * time.Minute)
+		}
 	}
 
 	if err = c.setSessionID(res); err != nil {
@@ -321,6 +357,11 @@ func (c *Client) setSessionID(res *http.Response) error {
 	return nil
 }
 
+// вызывается при ошибке rpc запроса, так как видимо sessionID имеет свойство "протухать"(сутки + видимо срок жизни), и от этого будут 401 ответы
+func (c *Client) RefreshSessionID() error {
+	return c.RemoteLogin(c.remoteLoginCreds.uid, c.remoteLoginCreds.passwd)
+}
+
 // Login to FreeIPA using web API with uid/passwd and set the FreeIPA session
 // id on the client for subsequent requests.
 func (c *Client) RemoteLogin(uid, passwd string) error {
@@ -328,6 +369,10 @@ func (c *Client) RemoteLogin(uid, passwd string) error {
 
 	form := url.Values{"user": {uid}, "password": {passwd}}
 	req, err := http.NewRequest("POST", ipaUrl, strings.NewReader(form.Encode()))
+	if err != nil {
+		return err
+	}
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa", c.host))
 
@@ -360,6 +405,11 @@ func (c *Client) RemoteLogin(uid, passwd string) error {
 
 	if err = c.setSessionID(res); err != nil {
 		return err
+	}
+
+	c.remoteLoginCreds = remoteLoginCreds{
+		uid:    uid,
+		passwd: passwd,
 	}
 
 	return nil
@@ -438,11 +488,11 @@ func (c *Client) LoginFromCCache(cpath string) error {
 // Parse a FreeIPA datetime. Datetimes in FreeIPA are returned using a
 // class-hint system. Values are stored as an array with a single element
 // indicating the type and value, for example, '[{"__datetime__": "YYYY-MM-DDTHH:MM:SSZ"]}'
-func ParseDateTime(str string) time.Time {
+func ParseDateTime(str string) *time.Time {
 	dt, err := time.Parse(IpaDatetimeFormat, str)
 	if err != nil {
-		return time.Time{}
+		return nil
 	}
 
-	return dt
+	return &dt
 }

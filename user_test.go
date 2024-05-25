@@ -9,17 +9,18 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
+	ipa "github.com/ivanovilia96/goipa"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/ubccr/goipa"
 )
 
 func addTestUser(c *ipa.Client, username, password string) (*ipa.User, error) {
-	user := *ipa.User{}
+	user := ipa.User{}
+	
 	user.Username = username
 	user.First = gofakeit.FirstName()
 	user.Last = gofakeit.LastName()
-	rec, err := c.UserAdd(user, password != "")
+	rec, err := c.UserAdd(&user, password != "")
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +39,7 @@ func TestUserShow(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	rec, err := c.UserShow(TestEnvAdminUser)
@@ -51,7 +52,7 @@ func TestUserAuthTypes(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()
@@ -77,7 +78,7 @@ func TestUserMod(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()
@@ -114,19 +115,19 @@ func TestUserAdd(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
-	user := *ipa.User{}
+	user := ipa.User{}
 	user.Username = gofakeit.Username()
 	user.Email = gofakeit.Email()
 	user.First = gofakeit.FirstName()
 	user.Last = gofakeit.LastName()
-	user.Home = "/user/" + username
+	// user.Home = "/user/" + username
 	user.Shell = "/bin/bash"
 	password := gofakeit.Password(true, true, true, true, false, 16)
 
-	rec, err := c.UserAddWithPassword(user, password)
+	rec, err := c.UserAddWithPassword(&user, password)
 	require.NoErrorf(err, "Failed to add user")
 
 	assert.Equalf(strings.ToLower(user.Username), rec.Username, "User username invalid")
@@ -136,7 +137,7 @@ func TestUserAdd(t *testing.T) {
 	assert.Equalf(user.HomeDir, rec.HomeDir, "Homedir is invalid")
 	assert.Equalf(user.Shell, rec.Shell, "Shell is invalid")
 
-	userClient := ipa.NewDefaultClient()
+	userClient := ipa.NewDefaultClient(false)
 	err = userClient.RemoteLogin(user.Username, password)
 	require.NoErrorf(err, "Failed to login as new user account")
 	assert.NotEmptyf(c.SessionID(), "Missing sessionID for new user account")
@@ -149,7 +150,7 @@ func TestUserLock(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()
@@ -168,7 +169,7 @@ func TestUserLock(t *testing.T) {
 
 	assert.Truef(rec.Locked, "Account should be locked")
 
-	userClient := ipa.NewDefaultClient()
+	userClient := ipa.NewDefaultClient(false)
 	err = userClient.RemoteLogin(username, password)
 	assert.Errorf(err, "User should not be able to login")
 
@@ -180,7 +181,7 @@ func TestUserLock(t *testing.T) {
 
 	assert.Falsef(rec.Locked, "Account should not be disabled")
 
-	userClient = ipa.NewDefaultClient()
+	userClient = ipa.NewDefaultClient(false)
 	err = userClient.RemoteLogin(username, password)
 	assert.NoErrorf(err, "User should be able to login")
 
@@ -192,7 +193,7 @@ func TestSSHKeys(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()
@@ -229,7 +230,7 @@ func TestUserFind(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()

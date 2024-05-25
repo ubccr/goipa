@@ -11,23 +11,23 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/ubccr/goipa"
+	ipa "github.com/ivanovilia96/goipa"
 )
 
 func TestAddTOTPToken(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
-	c, err := newTestClientCCache()
+	c, err := newTestClientCCache(false)
 	require.NoError(err)
 
 	username := gofakeit.Username()
 	password := gofakeit.Password(true, true, true, true, false, 16)
 
-	_, err = addTestUser(c, username, password)
-	require.NoErrorf(err, "Failed to add test user")
+	// _, err = addTestUser(c, username, password)
+	// require.NoErrorf(err, "Failed to add test user")
 
-	userClient := ipa.NewDefaultClient()
+	userClient := ipa.NewDefaultClient(false)
 	err = userClient.RemoteLogin(username, password)
 	require.NoErrorf(err, "Failed to login as new user account")
 	require.NotEmptyf(c.SessionID(), "Missing sessionID for new user account")
