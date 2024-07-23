@@ -7,16 +7,18 @@ package ipa
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -97,7 +99,7 @@ type Response struct {
 func init() {
 	// If ca.crt for ipa exists, use it as the cert pool
 	// otherwise default to system root ca.
-	pem, err := ioutil.ReadFile("/etc/ipa/ca.crt")
+	pem, err := os.ReadFile("/etc/ipa/ca.crt")
 	if err == nil {
 		ipaCertPool = x509.NewCertPool()
 		if !ipaCertPool.AppendCertsFromPEM(pem) {
@@ -178,85 +180,6 @@ func NewClientCustomHttp(host, realm string, httpClient *http.Client) *Client {
 
 func (e *IpaError) Error() string {
 	return fmt.Sprintf("ipa: error %d - %s", e.Code, e.Message)
-}
-
-// Call FreeIPA API with method, params and options
-func (c *Client) rpc(method string, params []string, options Options) (*Response, error) {
-	if options == nil {
-		options = Options{}
-	}
-	options["version"] = IpaClientVersion
-
-	data := []interface{}{
-		params,
-		options,
-	}
-
-	payload := Options{
-		"id":     0,
-		"method": method,
-		"params": data,
-	}
-
-	b, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	ipaUrl := fmt.Sprintf("https://%s/ipa/json", c.host)
-	if len(c.sessionID) > 0 {
-		ipaUrl = fmt.Sprintf("https://%s/ipa/session/json", c.host)
-	}
-
-	req, err := http.NewRequest("POST", ipaUrl, bytes.NewBuffer(b))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa/xml", c.host))
-
-	if len(c.sessionID) > 0 {
-		// If session is set, use the session id
-		req.Header.Set("Cookie", fmt.Sprintf("ipa_session=%s", c.sessionID))
-	} else if c.krbClient != nil {
-		// use Kerberos auth (SPNEGO)
-		spnego.SetSPNEGOHeader(c.krbClient, req, "")
-	}
-
-	if log.IsLevelEnabled(log.TraceLevel) {
-		dump, _ := httputil.DumpRequestOut(req, true)
-		log.Tracef("FreeIPA RPC request: %s", dump)
-	}
-
-	res, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("IPA RPC called failed with HTTP status code: %d", res.StatusCode)
-	}
-
-	if err = c.setSessionID(res); err != nil {
-		return nil, err
-	}
-
-	rawJson, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Tracef("FreeIPA JSON response: %s", string(rawJson))
-
-	var ipaRes Response
-	err = json.Unmarshal(rawJson, &ipaRes)
-	if err != nil {
-		return nil, err
-	}
-
-	if ipaRes.Error != nil {
-		return nil, ipaRes.Error
-	}
-
-	return &ipaRes, nil
 }
 
 // Returns FreeIPA server hostname
@@ -433,6 +356,159 @@ func (c *Client) LoginFromCCache(cpath string) error {
 	c.krbClient = cl
 
 	return nil
+}
+
+// Call FreeIPA API with method, params and options
+func (c *Client) rpc(method string, params []string, options Options) (*Response, error) {
+	if options == nil {
+		options = Options{}
+	}
+	options["version"] = IpaClientVersion
+
+	data := []interface{}{
+		params,
+		options,
+	}
+
+	payload := Options{
+		"id":     0,
+		"method": method,
+		"params": data,
+	}
+
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	ipaUrl := fmt.Sprintf("https://%s/ipa/json", c.host)
+	if len(c.sessionID) > 0 {
+		ipaUrl = fmt.Sprintf("https://%s/ipa/session/json", c.host)
+	}
+
+	req, err := http.NewRequest("POST", ipaUrl, bytes.NewBuffer(b))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa/xml", c.host))
+
+	if len(c.sessionID) > 0 {
+		// If session is set, use the session id
+		req.Header.Set("Cookie", fmt.Sprintf("ipa_session=%s", c.sessionID))
+	} else if c.krbClient != nil {
+		// use Kerberos auth (SPNEGO)
+		spnego.SetSPNEGOHeader(c.krbClient, req, "")
+	}
+
+	if log.IsLevelEnabled(log.TraceLevel) {
+		dump, _ := httputil.DumpRequestOut(req, true)
+		log.Tracef("FreeIPA RPC request: %s", dump)
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf("IPA RPC called failed with HTTP status code: %d", res.StatusCode)
+	}
+
+	if err = c.setSessionID(res); err != nil {
+		return nil, err
+	}
+
+	rawJson, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Tracef("FreeIPA JSON response: %s", string(rawJson))
+
+	var ipaRes Response
+	err = json.Unmarshal(rawJson, &ipaRes)
+	if err != nil {
+		return nil, err
+	}
+
+	if ipaRes.Error != nil {
+		return nil, ipaRes.Error
+	}
+
+	return &ipaRes, nil
+}
+
+func (c *Client) rpcContext(ctx context.Context, method string, arguments []string, options map[string]any) (*Response, error) {
+	options["version"] = IpaClientVersion
+
+	payload := map[string]any{
+		"id":     0,
+		"method": method,
+		"params": []any{
+			arguments,
+			options,
+		},
+	}
+
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	ipaUrl := fmt.Sprintf("https://%s/ipa/json", c.host)
+	if len(c.sessionID) > 0 {
+		ipaUrl = fmt.Sprintf("https://%s/ipa/session/json", c.host)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", ipaUrl, bytes.NewBuffer(b))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Referer", fmt.Sprintf("https://%s/ipa/xml", c.host))
+
+	if len(c.sessionID) > 0 {
+		// If session is set, use the session id
+		req.Header.Set("Cookie", fmt.Sprintf("ipa_session=%s", c.sessionID))
+	} else if c.krbClient != nil {
+		// use Kerberos auth (SPNEGO)
+		spnego.SetSPNEGOHeader(c.krbClient, req, "")
+	}
+
+	if log.IsLevelEnabled(log.TraceLevel) {
+		dump, _ := httputil.DumpRequestOut(req, true)
+		log.Tracef("FreeIPA RPC request: %s", dump)
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf("IPA RPC called failed with HTTP status code: %d", res.StatusCode)
+	}
+
+	if err = c.setSessionID(res); err != nil {
+		return nil, err
+	}
+
+	rawJson, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Tracef("FreeIPA JSON response: %s", string(rawJson))
+
+	ipaRes := &Response{}
+	err = json.Unmarshal(rawJson, &ipaRes)
+	if err != nil {
+		return nil, err
+	}
+
+	if ipaRes.Error != nil {
+		return nil, ipaRes.Error
+	}
+
+	return ipaRes, nil
 }
 
 // Parse a FreeIPA datetime. Datetimes in FreeIPA are returned using a
